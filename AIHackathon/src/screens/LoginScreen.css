@@ -125,18 +125,36 @@
      gap: 1rem;
    }
    
-   .login-footer {
-     margin-top: 1.5rem;
-     font-size: 0.9375rem;
-     color: rgba(255, 255, 255, 0.5);
-   }
-   
-   .signup-link {
-     color: #3b82f6;
-     text-decoration: none;
-     font-weight: 500;
-   }
-   
-   .signup-link:hover {
-     color: #60a5fa;
-   }
+.login-footer {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+}
+
+.signup-link {
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.signup-link:hover {
+  color: #60a5fa;
+}
+
+.back-link {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.back-link:hover {
+  color: #ffffff;
+}
+
+.login-logo-icon.org-icon {
+  color: #8b5cf6;
+}

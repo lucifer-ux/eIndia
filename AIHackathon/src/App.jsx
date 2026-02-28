@@ -1,47 +1,66 @@
 import { useState } from 'react'
    import LandingPage from './screens/LandingPage'
    import LoginScreen from './screens/LoginScreen'
+   import OrgLoginScreen from './screens/OrgLoginScreen'
    import Dashboard from './screens/Dashboard'
+   import OrgDashboard from './screens/OrgDashboard'
    import './App.css'
-   
+
    function App() {
      const [currentScreen, setCurrentScreen] = useState('landing')
-     const [isAuthenticated, setIsAuthenticated] = useState(false)
-   
+
      const handleLoginAsUser = () => {
-       setCurrentScreen('login')
+       setCurrentScreen('login-user')
      }
-   
-     const handleLoginSuccess = () => {
-       setIsAuthenticated(true)
+
+     const handleLoginAsOrg = () => {
+       setCurrentScreen('login-org')
+     }
+
+     const handleUserLoginSuccess = () => {
        setCurrentScreen('dashboard')
      }
-   
+
+     const handleOrgLoginSuccess = () => {
+       setCurrentScreen('org-dashboard')
+     }
+
      const handleLogout = () => {
-       setIsAuthenticated(false)
        setCurrentScreen('landing')
      }
-   
+
      const handleBackToHome = () => {
        setCurrentScreen('landing')
      }
-   
+
      return (
        <>
          {currentScreen === 'landing' && (
-           <LandingPage onLoginAsUser={handleLoginAsUser} />
+           <LandingPage 
+             onLoginAsUser={handleLoginAsUser}
+             onLoginAsOrg={handleLoginAsOrg}
+           />
          )}
-         {currentScreen === 'login' && (
+         {currentScreen === 'login-user' && (
            <LoginScreen 
-             onLoginSuccess={handleLoginSuccess} 
+             onLoginSuccess={handleUserLoginSuccess} 
+             onBackToHome={handleBackToHome}
+           />
+         )}
+         {currentScreen === 'login-org' && (
+           <OrgLoginScreen 
+             onLoginSuccess={handleOrgLoginSuccess}
              onBackToHome={handleBackToHome}
            />
          )}
          {currentScreen === 'dashboard' && (
            <Dashboard onLogout={handleLogout} />
          )}
+         {currentScreen === 'org-dashboard' && (
+           <OrgDashboard onLogout={handleLogout} />
+         )}
        </>
      )
    }
-   
+
    export default App

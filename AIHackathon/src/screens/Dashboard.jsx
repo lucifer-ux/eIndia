@@ -120,7 +120,7 @@ const Dashboard = ({ onLogout }) => {
               )}
               <div className="message-content">
                 <div dangerouslySetInnerHTML={{ __html: formatMessage(message.content) }} />
-                
+
                 {/* Buy Results */}
                 {message.buyData && message.buyData.results && (
                   <div className="buy-results">
@@ -130,10 +130,10 @@ const Dashboard = ({ onLogout }) => {
                     </div>
                     <div className="buy-results-list">
                       {message.buyData.results.map((result) => (
-                        <a 
-                          key={result.rank} 
-                          href={result.buy_link} 
-                          target="_blank" 
+                        <a
+                          key={result.rank}
+                          href={result.buy_link}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="buy-result-card"
                         >
@@ -163,10 +163,10 @@ const Dashboard = ({ onLogout }) => {
                   <div className="sources">
                     <p className="sources-title">Sources:</p>
                     {message.sources.map((source, idx) => (
-                      <a 
-                        key={idx} 
-                        href={source.url} 
-                        target="_blank" 
+                      <a
+                        key={idx}
+                        href={source.url}
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="source-link"
                       >
@@ -207,7 +207,7 @@ const Dashboard = ({ onLogout }) => {
               placeholder="Ask about electronics, compare prices, or search for products..."
               disabled={isLoading}
             />
-            <button 
+            <button
               className="send-btn"
               onClick={handleSend}
               disabled={isLoading || !inputValue.trim()}

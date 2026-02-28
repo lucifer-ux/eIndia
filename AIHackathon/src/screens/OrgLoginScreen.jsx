@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import InputField from '../components/InputField';
+import SocialLoginButton from '../components/SocialLoginButton';
 import Navbar from '../components/Navbar';
+import { sellerLoginWithEmail, sellerSignupWithEmail, sellerLoginWithGoogle, resetPassword } from '../services/authService';
 import './LoginScreen.css';
 
 const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
@@ -9,21 +11,72 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
     password: ''
   });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate org credentials
-    if (formData.email === 'org@electrofind.com' && formData.password === 'org123') {
+    setError('');
+    setLoading(true);
+
+    try {
+      if (isSignup) {
+        const result = await sellerSignupWithEmail(formData.email, formData.password);
+        onLoginSuccess(result.seller || result);
+      } else {
+        const result = await sellerLoginWithEmail(formData.email, formData.password);
+        onLoginSuccess(result.seller || result);
+      }
+    } catch (err) {
+      const msg = err.code === 'auth/user-not-found' ? 'No account found with this email'
+        : err.code === 'auth/wrong-password' ? 'Incorrect password'
+          : err.code === 'auth/email-already-in-use' ? 'An account with this email already exists'
+            : err.code === 'auth/weak-password' ? 'Password should be at least 6 characters'
+              : err.code === 'auth/invalid-email' ? 'Please enter a valid email address'
+                : err.code === 'auth/invalid-credential' ? 'Invalid email or password'
+                  : err.message || 'Authentication failed';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const result = await sellerLoginWithGoogle();
+      onLoginSuccess(result.seller || result);
+    } catch (err) {
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setError(err.message || 'Google login failed');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!formData.email) {
+      setError('Please enter your email address first');
+      return;
+    }
+    setLoading(true);
+    try {
+      await resetPassword(formData.email);
+      setResetSent(true);
       setError('');
-      onLoginSuccess();
-    } else {
-      setError('Invalid organization credentials');
+    } catch (err) {
+      setError(err.message || 'Failed to send reset email');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -61,15 +114,24 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
     </svg>
   );
 
+  const GoogleIcon = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+    </svg>
+  );
+
   return (
     <div className="login-screen">
       <Navbar
         logoIcon={<LightningIcon />}
         logoText="ElectroFind"
-        onLoginClick={() => {}}
-        onSignupClick={() => {}}
+        onLoginClick={() => { }}
+        onSignupClick={() => { }}
       />
-      
+
       <div className="login-container">
         <div className="login-card">
           <div className="login-logo">
@@ -77,12 +139,13 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
               <BuildingIcon />
             </div>
           </div>
-          
-          <h1 className="login-title">Organization Login</h1>
-          <p className="login-subtitle">Access your organization's dashboard</p>
-          
+
+          <h1 className="login-title">{isSignup ? 'Create Organization Account' : 'Organization Login'}</h1>
+          <p className="login-subtitle">{isSignup ? 'Sign up your organization' : "Access your organization's dashboard"}</p>
+
           {error && <div className="login-error">{error}</div>}
-          
+          {resetSent && <div className="login-success">Password reset email sent! Check your inbox.</div>}
+
           <form onSubmit={handleSubmit} className="login-form">
             <InputField
               label="Organization Email"
@@ -93,24 +156,42 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
               value={formData.email}
               onChange={handleChange}
             />
-            
+
             <InputField
               label="Password"
               name="password"
               type="password"
               placeholder="Enter your password"
               icon={<LockIcon />}
+              rightElement={!isSignup ? <a href="#forgot" className="forgot-password-link" onClick={handleForgotPassword}>Forgot password?</a> : null}
               value={formData.password}
               onChange={handleChange}
             />
-            
-            <button type="submit" className="login-submit-btn">
-              Continue
+
+            <button type="submit" className="login-submit-btn" disabled={loading}>
+              {loading ? 'Please wait...' : (isSignup ? 'Sign Up' : 'Continue')}
             </button>
           </form>
+
+          <div className="login-divider">
+            <span className="divider-line"></span>
+            <span className="divider-text">OR CONTINUE WITH</span>
+            <span className="divider-line"></span>
+          </div>
+
+          <div className="social-login-buttons">
+            <SocialLoginButton
+              icon={<GoogleIcon />}
+              text="Google"
+              onClick={handleGoogleLogin}
+            />
+          </div>
         </div>
-        
+
         <p className="login-footer">
+          <button className="back-link" onClick={() => setIsSignup(!isSignup)}>
+            {isSignup ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
+          </button>
           <button className="back-link" onClick={onBackToHome}>
             ← Back to Home
           </button>

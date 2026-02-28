@@ -3,6 +3,7 @@ const cors = require('cors');
 const OpenAI = require('openai');
 const { tavily } = require('@tavily/core');
 require('dotenv').config();
+const authRoutes = require('./authRoutes');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -10,6 +11,7 @@ const port = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/api/auth', authRoutes);
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -116,7 +118,7 @@ Assistant:`;
 // Check intent using OpenAI
 async function checkIntent(query) {
   const prompt = INTENT_CHECK_PROMPT.replace('{query}', query);
-  
+
   try {
     const stream = await openai.responses.create({
       model: MODEL,
@@ -146,7 +148,7 @@ async function checkIntent(query) {
 // Expand buy query using OpenAI
 async function expandBuyQuery(query) {
   const prompt = BUY_QUERY_EXPANSION_PROMPT.replace('{query}', query);
-  
+
   try {
     const stream = await openai.responses.create({
       model: MODEL,
@@ -186,7 +188,7 @@ async function expandBuyQuery(query) {
 // Enhance query for Tavily (general research)
 async function enhanceQuery(query) {
   const prompt = ENHANCE_PROMPT.replace('{query}', query);
-  
+
   try {
     const stream = await openai.responses.create({
       model: MODEL,
@@ -213,7 +215,7 @@ async function enhanceQuery(query) {
 // Get chat response from OpenAI
 async function getChatResponse(query) {
   const prompt = CHAT_PROMPT.replace('{query}', query);
-  
+
   try {
     const stream = await openai.responses.create({
       model: MODEL,
@@ -241,7 +243,7 @@ async function getChatResponse(query) {
 async function performBuySearch(expandedQueryData) {
   try {
     const searchQuery = expandedQueryData.expanded_query;
-    
+
     const response = await tavilyClient.search(searchQuery, {
       search_depth: 'advanced',
       include_answer: false,
@@ -271,7 +273,7 @@ async function performBuySearch(expandedQueryData) {
       // Extract price if present
       const priceMatch = (r.content || '').match(/\$[\d,]+(?:\.\d{2})?/);
       const price = priceMatch ? priceMatch[0] : 'Price varies';
-      
+
       // Infer store from domain
       const domain = new URL(r.url).hostname.replace('www.', '');
       const storeMap = {
@@ -334,18 +336,18 @@ async function performResearch(query) {
 // Search endpoint
 app.post('/api/search', async (req, res) => {
   const { query } = req.body;
-  
+
   if (!query || !query.trim()) {
     return res.status(400).json({ error: 'Query is required' });
   }
 
   try {
     console.log('Processing query:', query);
-    
+
     // Step 1: Check intent
     const intent = await checkIntent(query);
     console.log('Detected intent:', intent);
-    
+
     if (intent === 'CHAT') {
       // Handle chat
       const response = await getChatResponse(query);
@@ -358,9 +360,9 @@ app.post('/api/search', async (req, res) => {
       // Handle electronics purchase
       const expandedQueryData = await expandBuyQuery(query);
       console.log('Expanded query:', expandedQueryData);
-      
+
       const buyResults = await performBuySearch(expandedQueryData);
-      
+
       return res.json({
         type: 'buy',
         originalQuery: query,
@@ -373,9 +375,9 @@ app.post('/api/search', async (req, res) => {
       // Handle general research
       const enhancedQuery = await enhanceQuery(query);
       console.log('Enhanced query:', enhancedQuery);
-      
+
       const researchResults = await performResearch(enhancedQuery);
-      
+
       return res.json({
         type: 'research',
         originalQuery: query,
@@ -391,9 +393,9 @@ app.post('/api/search', async (req, res) => {
     }
   } catch (error) {
     console.error('Search error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'An error occurred while processing your request',
-      details: error.message 
+      details: error.message
     });
   }
 });

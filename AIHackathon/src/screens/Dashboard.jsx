@@ -15,6 +15,7 @@ const Dashboard = ({ onLogout }) => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [playingId, setPlayingId] = useState(null);
   const messagesEndRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -120,8 +121,9 @@ const Dashboard = ({ onLogout }) => {
         formData.append('audio', audioBlob, 'recording.webm');
         formData.append('language', i18n.language);
 
+        setIsTranscribing(true);
         try {
-          const response = await fetch('http://localhost:5001/stt', {
+          const response = await fetch('http://localhost:3001/api/stt', {
             method: 'POST',
             body: formData,
           });
@@ -131,6 +133,8 @@ const Dashboard = ({ onLogout }) => {
           }
         } catch (err) {
           console.error('STT error:', err);
+        } finally {
+          setIsTranscribing(false);
         }
       };
 
@@ -154,7 +158,7 @@ const Dashboard = ({ onLogout }) => {
     setPlayingId(messageId);
 
     try {
-      const response = await fetch('http://localhost:5001/tts', {
+      const response = await fetch('http://localhost:3001/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, language: i18n.language }),
@@ -283,20 +287,26 @@ const Dashboard = ({ onLogout }) => {
         </div>
 
         <div className="input-container">
-          <div className="input-wrapper">
+          <div className={`input-wrapper ${isTranscribing ? 'transcribing' : ''}`}>
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder={t('dashboard.placeholder')}
-              disabled={isLoading}
+              placeholder={isTranscribing ? t('dashboard.transcribing') || 'Transcribing...' : t('dashboard.placeholder')}
+              disabled={isLoading || isTranscribing}
             />
+            {isTranscribing && (
+              <div className="stt-loader">
+                <span></span><span></span><span></span>
+              </div>
+            )}
             <button
               className={`mic-btn ${isRecording ? 'recording' : ''}`}
               onMouseDown={startRecording}
               onMouseUp={stopRecording}
               onMouseLeave={stopRecording}
+              disabled={isTranscribing}
               title="Hold to speak"
             >
               🎤
@@ -304,7 +314,7 @@ const Dashboard = ({ onLogout }) => {
             <button
               className="send-btn"
               onClick={handleSend}
-              disabled={isLoading || !inputValue.trim()}
+              disabled={isLoading || !inputValue.trim() || isTranscribing}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="22" y1="2" x2="11" y2="13"></line>

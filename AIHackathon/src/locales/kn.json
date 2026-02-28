@@ -43,6 +43,7 @@
     "orgLogin.emailPlaceholder": "org@company.com",
     "dashboard.greeting": "ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ AI ಸಹಾಯಕ. ಎಲೆಕ್ಟ್ರಾನಿಕ್ಸ್ ಹುಡುಕಲು, ಉತ್ಪನ್ನಗಳ ಬಗ್ಗೆ ಸಂಶೋಧಿಸಲು ಅಥವಾ ಪ್ರಶ್ನೆಗಳಿಗೆ ಉತ್ತರಿಸಲು ನಾನು ಸಹಾಯ ಮಾಡಬಲ್ಲೆ.",
     "dashboard.placeholder": "ಎಲೆಕ್ಟ್ರಾನಿಕ್ಸ್ ಬಗ್ಗೆ ಕೇಳಿ, ಬೆಲೆಗಳನ್ನು ಹೋಲಿಸಿ...",
+    "dashboard.transcribing": "ಟ್ರಾನ್ಸ್‌ಕ್ರಿಪ್ಟ್ ಆಗುತ್ತಿದೆ...",
     "dashboard.inputHint": "ಕಳುಹಿಸಲು Enter ಒತ್ತಿ",
     "dashboard.error": "ಕ್ಷಮಿಸಿ, ದೋಷ ಸಂಭವಿಸಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "dashboard.sources": "ಮೂಲಗಳು:",

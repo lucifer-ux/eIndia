@@ -43,6 +43,7 @@
     "orgLogin.emailPlaceholder": "org@company.com",
     "dashboard.greeting": "नमस्कार! मी तुमचा AI सहाय्यक आहे. इलेक्ट्रॉनिक्स शोधणे, उत्पादनांवर संशोधन करणे किंवा प्रश्नांची उत्तरे देणे यात मी मदत करू शकतो.",
     "dashboard.placeholder": "इलेक्ट्रॉनिक्सबद्दल विचारा, किमती तुलना करा...",
+    "dashboard.transcribing": "ट्रान्सक्रिप्ट होत आहे...",
     "dashboard.inputHint": "पाठवण्यासाठी Enter दाबा",
     "dashboard.error": "क्षमस्व, त्रुटी आली. कृपया पुन्हा प्रयत्न करा.",
     "dashboard.sources": "स्रोत:",

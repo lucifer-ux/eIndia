@@ -43,6 +43,7 @@
     "orgLogin.emailPlaceholder": "org@company.com",
     "dashboard.greeting": "ਸਤ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਤੁਹਾਡਾ AI ਸਹਾਇਕ ਹਾਂ। ਮੈਂ ਇਲੈਕਟ੍ਰੌਨਿਕਸ ਲੱਭਣ ਵਿੱਚ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ।",
     "dashboard.placeholder": "ਇਲੈਕਟ੍ਰੌਨਿਕਸ ਬਾਰੇ ਪੁੱਛੋ...",
+    "dashboard.transcribing": "ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਹੋ ਰਿਹਾ ਹੈ...",
     "dashboard.inputHint": "ਭੇਜਣ ਲਈ Enter ਦਬਾਓ",
     "dashboard.error": "ਮੁਆਫ਼ ਕਰਨਾ, ਤਰੁੱਟੀ ਆਈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "dashboard.sources": "ਸਰੋਤ:",

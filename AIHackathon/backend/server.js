@@ -2,11 +2,52 @@ const express = require('express');
 const cors = require('cors');
 const OpenAI = require('openai');
 const { tavily } = require('@tavily/core');
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { TranscribeClient, StartTranscriptionJobCommand, GetTranscriptionJobCommand, DeleteTranscriptionJobCommand } = require('@aws-sdk/client-transcribe');
+const { PollyClient, SynthesizeSpeechCommand } = require('@aws-sdk/client-polly');
+const multer = require('multer');
 require('dotenv').config();
 const authRoutes = require('./authRoutes');
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// Configure multer for memory storage
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Initialize AWS clients
+const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
+const transcribeClient = new TranscribeClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const pollyClient = new PollyClient({ region: process.env.AWS_REGION || 'us-east-1' });
+
+const S3_BUCKET = process.env.S3_BUCKET || 'your-bucket-name';
+
+// Language mappings
+const LANGUAGE_MAP = {
+  en: 'en-US',
+  hi: 'hi-IN',
+  kn: 'kn-IN',
+  te: 'te-IN',
+  ta: 'ta-IN',
+  mr: 'mr-IN',
+  pa: 'pa-IN',
+  bn: 'bn-IN',
+  gu: 'gu-IN',
+  ml: 'ml-IN',
+};
+
+const POLLY_VOICES = {
+  en: 'Joanna',
+  hi: 'Aditi',
+  kn: 'Aditi',
+  te: 'Aditi',
+  ta: 'Aditi',
+  mr: 'Aditi',
+  pa: 'Aditi',
+  bn: 'Aditi',
+  gu: 'Aditi',
+  ml: 'Aditi',
+};
 
 // Middleware
 app.use(cors());
@@ -516,6 +557,145 @@ app.post('/api/search', async (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// STT - Speech to Text using Amazon Transcribe
+app.post('/api/stt', upload.single('audio'), async (req, res) => {
+  const language = req.body.language || 'en';
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'Audio file is required', transcript: '' });
+  }
+
+  const jobName = `stt-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+  const s3Key = `uploads/${jobName}.wav`;
+
+  try {
+    console.log('STT: Uploading audio to S3:', s3Key);
+
+    // Upload audio to S3
+    await s3Client.send(new PutObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: s3Key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+    }));
+
+    // Start transcription job
+    const awsLanguage = LANGUAGE_MAP[language] || 'en-US';
+    console.log('STT: Starting transcription job:', jobName, 'language:', awsLanguage);
+
+    await transcribeClient.send(new StartTranscriptionJobCommand({
+      TranscriptionJobName: jobName,
+      Media: { MediaFileUri: `s3://${S3_BUCKET}/${s3Key}` },
+      MediaFormat: 'wav',
+      LanguageCode: awsLanguage,
+    }));
+
+    // Poll for completion (max 60 seconds)
+    const maxRetries = 30;
+    for (let i = 0; i < maxRetries; i++) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const response = await transcribeClient.send(new GetTranscriptionJobCommand({
+        TranscriptionJobName: jobName,
+      }));
+
+      const status = response.TranscriptionJob.TranscriptionJobStatus;
+
+      if (status === 'COMPLETED') {
+        // Fetch transcript from result URL
+        const transcriptUrl = response.TranscriptionJob.Transcript.TranscriptFileUri;
+        const fetchResponse = await fetch(transcriptUrl);
+        const result = await fetchResponse.json();
+        const transcript = result.results.transcripts[0].transcript;
+
+        console.log('STT: Transcription completed:', transcript.substring(0, 50) + '...');
+
+        // Cleanup
+        await cleanupTranscribe(jobName, s3Key);
+
+        return res.json({
+          transcript: transcript.trim(),
+          language: language,
+        });
+      }
+
+      if (status === 'FAILED') {
+        const failureReason = response.TranscriptionJob.FailureReason || 'Unknown error';
+        console.error('STT: Transcription failed:', failureReason);
+        await cleanupTranscribe(jobName, s3Key);
+        return res.status(500).json({ error: `Transcription failed: ${failureReason}`, transcript: '' });
+      }
+    }
+
+    // Timeout
+    await cleanupTranscribe(jobName, s3Key);
+    return res.status(500).json({ error: 'Transcription timeout', transcript: '' });
+
+  } catch (error) {
+    console.error('STT error:', error);
+    await cleanupTranscribe(jobName, s3Key);
+    return res.status(500).json({ error: error.message, transcript: '' });
+  }
+});
+
+// Helper function to cleanup Transcribe resources
+async function cleanupTranscribe(jobName, s3Key) {
+  try {
+    if (jobName) {
+      await transcribeClient.send(new DeleteTranscriptionJobCommand({
+        TranscriptionJobName: jobName,
+      })).catch(() => {});
+    }
+    if (s3Key) {
+      await s3Client.send(new DeleteObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: s3Key,
+      })).catch(() => {});
+    }
+  } catch (e) {
+    console.warn('Cleanup error:', e.message);
+  }
+}
+
+// TTS - Text to Speech using Amazon Polly
+app.post('/api/tts', async (req, res) => {
+  const { text, language } = req.body;
+
+  if (!text) {
+    return res.status(400).json({ error: 'Text is required' });
+  }
+
+  try {
+    const voiceId = POLLY_VOICES[language] || 'Aditi';
+    const awsLanguage = LANGUAGE_MAP[language] || 'en-US';
+
+    console.log('TTS: Generating speech for:', text.substring(0, 50) + '...', 'voice:', voiceId);
+
+    const command = new SynthesizeSpeechCommand({
+      Text: text,
+      OutputFormat: 'mp3',
+      VoiceId: voiceId,
+      LanguageCode: awsLanguage,
+    });
+
+    const response = await pollyClient.send(command);
+
+    // Convert stream to buffer
+    const chunks = [];
+    for await (const chunk of response.AudioStream) {
+      chunks.push(chunk);
+    }
+    const audioBuffer = Buffer.concat(chunks);
+
+    res.set('Content-Type', 'audio/mpeg');
+    res.send(audioBuffer);
+
+  } catch (error) {
+    console.error('TTS error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.listen(port, () => {

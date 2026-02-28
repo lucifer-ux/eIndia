@@ -43,6 +43,7 @@
     "orgLogin.emailPlaceholder": "org@company.com",
     "dashboard.greeting": "வணக்கம்! நான் உங்கள் AI உதவியாளர். மின்னணுவியல் கண்டறிதல், தயாரிப்புகளை ஆராய்தல் அல்லது கேள்விகளுக்குப் பதிலளிப்பதில் உதவ முடியும்.",
     "dashboard.placeholder": "மின்னணுவியல் பற்றிக் கேளுங்கள்...",
+    "dashboard.transcribing": "எழுத்தாக்கம் செய்யப்படுகிறது...",
     "dashboard.inputHint": "அனுப்ப Enter அழுத்தவும்",
     "dashboard.error": "மன்னிக்கவும், பிழை ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்.",
     "dashboard.sources": "ஆதாரங்கள்:",

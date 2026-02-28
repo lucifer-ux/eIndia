@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import LanguageSelector from '../components/LanguageSelector';
 import './Dashboard.css';
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 const Dashboard = ({ onLogout }) => {
   const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState([
@@ -50,7 +52,7 @@ const Dashboard = ({ onLogout }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3001/api/search', {
+      const response = await fetch(`${API_URL}/api/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: userMessage.content, language: i18n.language }),
@@ -123,7 +125,7 @@ const Dashboard = ({ onLogout }) => {
 
         setIsTranscribing(true);
         try {
-          const response = await fetch('http://localhost:3001/api/stt', {
+          const response = await fetch(`${API_URL}/api/stt`, {
             method: 'POST',
             body: formData,
           });
@@ -158,7 +160,7 @@ const Dashboard = ({ onLogout }) => {
     setPlayingId(messageId);
 
     try {
-      const response = await fetch('http://localhost:3001/api/tts', {
+      const response = await fetch(`${API_URL}/api/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, language: i18n.language }),

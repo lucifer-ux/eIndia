@@ -1,0 +1,51 @@
+.trusted-by {
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.trusted-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.1);
+  max-width: 150px;
+}
+
+.trusted-title {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+
+.trusted-companies {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 3rem;
+  flex-wrap: wrap;
+}
+
+.company-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 2rem;
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: 0.5rem;
+  min-width: 120px;
+  height: 48px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.company-logo:hover {
+  opacity: 1;
+}

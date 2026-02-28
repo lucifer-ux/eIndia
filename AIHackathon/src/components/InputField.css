@@ -1,0 +1,65 @@
+.input-field {
+     display: flex;
+     flex-direction: column;
+     gap: 0.5rem;
+   }
+
+   .input-label-row {
+     display: flex;
+     justify-content: space-between;
+     align-items: center;
+   }
+
+   .input-label {
+     font-size: 0.9375rem;
+     font-weight: 500;
+     color: rgba(255, 255, 255, 0.9);
+   }
+
+   .input-right-element {
+     font-size: 0.875rem;
+   }
+
+   .input-right-element a {
+     color: #3b82f6;
+     text-decoration: none;
+   }
+
+   .input-right-element a:hover {
+     color: #60a5fa;
+   }
+
+   .input-wrapper {
+     position: relative;
+     display: flex;
+     align-items: center;
+   }
+
+   .input-icon {
+     position: absolute;
+     left: 1rem;
+     display: flex;
+     align-items: center;
+     color: rgba(255, 255, 255, 0.4);
+   }
+
+   .input-control {
+     width: 100%;
+     padding: 0.875rem 1rem 0.875rem 2.75rem;
+     background-color: rgba(255, 255, 255, 0.03);
+     border: 1px solid rgba(255, 255, 255, 0.1);
+     border-radius: 0.625rem;
+     color: #ffffff;
+     font-size: 0.9375rem;
+     transition: all 0.2s ease;
+   }
+
+   .input-control::placeholder {
+     color: rgba(255, 255, 255, 0.3);
+   }
+
+   .input-control:focus {
+     outline: none;
+     border-color: rgba(59, 130, 246, 0.5);
+     background-color: rgba(255, 255, 255, 0.05);
+   }

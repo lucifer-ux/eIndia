@@ -1,0 +1,29 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and Deploy
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd eIndia
+            git pull origin main
+
+            # Rebuild frontend
+            cd AiHackathon
+            npm install
+            npm run build
+
+            # Restart backend
+            cd backend
+            npm install
+            pm2 restart backend

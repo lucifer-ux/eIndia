@@ -99,13 +99,33 @@ User: "{query}"
 Output:`;
 
 // General query enhancement for research
-const ENHANCE_PROMPT = `You are a search query optimizer. Enhance the following user query to make it more specific and effective for web search. 
+const ENHANCE_PROMPT = `You are a search query optimizer. Enhance the following user query to make it more specific and effective for web search.
 Add relevant keywords, clarify intent, and make it comprehensive for better search results.
 Return ONLY the enhanced query without any explanation.
 
 Original Query: {query}
 
 Enhanced Query:`;
+
+// Buy intro message prompt
+const BUY_INTRO_PROMPT = `You are a helpful AI assistant. Generate a brief, friendly intro message in {language} telling the user you found options for a product category.
+
+Product Category: {category}
+Price Range: {priceRange}
+
+Respond ONLY with the intro message in {language}. Keep it under 2 sentences.`;
+
+// Research answer translation/summarization prompt
+const RESEARCH_SUMMARY_PROMPT = `You are a helpful AI assistant. Based on the research results below, provide a helpful summary in {language}.
+
+Original Question: {query}
+
+Research Answer (English): {answer}
+
+Sources:
+{sources}
+
+Provide a clear, helpful response in {language} summarizing the findings. If the answer is not helpful, create a better summary from the sources.`;
 
 // Chat response prompt
 const CHAT_PROMPT = `You are a helpful AI assistant for ElectroFind, an electronics discovery platform. 
@@ -250,6 +270,72 @@ async function getChatResponse(query, language = 'en') {
   }
 }
 
+// Generate buy intro message in user's language
+async function generateBuyIntro(productCategory, priceRange, language = 'en') {
+  if (language === 'en' || !LANG_NAMES[language]) {
+    return `I found some great options for **${productCategory}**. Here are the best deals sorted by price:`;
+  }
+
+  const prompt = BUY_INTRO_PROMPT
+    .replace(/{category}/g, productCategory)
+    .replace(/{priceRange}/g, priceRange)
+    .replace(/{language}/g, LANG_NAMES[language]);
+
+  try {
+    const stream = await openai.responses.create({
+      model: MODEL,
+      input: [{ role: 'user', content: prompt }],
+      stream: true,
+    });
+
+    let response = '';
+    for await (const event of stream) {
+      if (event.type === 'response.output_text.delta') {
+        response += event.delta;
+      }
+    }
+
+    return response.trim();
+  } catch (error) {
+    console.error('Error generating buy intro:', error);
+    return `I found some great options for **${productCategory}**. Here are the best deals sorted by price:`;
+  }
+}
+
+// Generate research summary in user's language
+async function generateResearchSummary(query, answer, sources, language = 'en') {
+  if (language === 'en' || !LANG_NAMES[language]) {
+    return answer || 'Here\'s what I found:';
+  }
+
+  const sourcesText = sources.map((s, i) => `${i + 1}. ${s.title}: ${s.content?.substring(0, 200) || ''}`).join('\n');
+  const prompt = RESEARCH_SUMMARY_PROMPT
+    .replace(/{language}/g, LANG_NAMES[language])
+    .replace(/{query}/g, query)
+    .replace(/{answer}/g, answer || 'No summary available')
+    .replace(/{sources}/g, sourcesText);
+
+  try {
+    const stream = await openai.responses.create({
+      model: MODEL,
+      input: [{ role: 'user', content: prompt }],
+      stream: true,
+    });
+
+    let response = '';
+    for await (const event of stream) {
+      if (event.type === 'response.output_text.delta') {
+        response += event.delta;
+      }
+    }
+
+    return response.trim();
+  } catch (error) {
+    console.error('Error generating research summary:', error);
+    return answer || 'Here\'s what I found:';
+  }
+}
+
 // Perform Tavily research for buying
 async function performBuySearch(expandedQueryData) {
   try {
@@ -374,13 +460,21 @@ app.post('/api/search', async (req, res) => {
 
       const buyResults = await performBuySearch(expandedQueryData);
 
+      // Generate intro message in user's language
+      const introMessage = await generateBuyIntro(
+        expandedQueryData.product_category,
+        expandedQueryData.price_range_hint,
+        language || 'en'
+      );
+
       return res.json({
         type: 'buy',
         originalQuery: query,
         expandedData: expandedQueryData,
         results: buyResults.results,
         searchStatus: buyResults.search_status,
-        totalFound: buyResults.total_found
+        totalFound: buyResults.total_found,
+        introMessage: introMessage
       });
     } else {
       // Handle general research
@@ -389,11 +483,19 @@ app.post('/api/search', async (req, res) => {
 
       const researchResults = await performResearch(enhancedQuery);
 
+      // Generate summary in user's language
+      const translatedAnswer = await generateResearchSummary(
+        query,
+        researchResults.answer,
+        researchResults.results,
+        language || 'en'
+      );
+
       return res.json({
         type: 'research',
         originalQuery: query,
         enhancedQuery: enhancedQuery,
-        answer: researchResults.answer,
+        answer: translatedAnswer,
         results: researchResults.results,
         sources: researchResults.results.map(r => ({
           title: r.title,

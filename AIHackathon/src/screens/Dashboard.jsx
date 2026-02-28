@@ -61,7 +61,7 @@ const Dashboard = ({ onLogout }) => {
         const buyMessage = {
           id: Date.now() + 1,
           type: 'ai',
-          content: `I found some great options for **${data.expandedData.product_category}**. Here are the best deals sorted by price:`,
+          content: data.introMessage || `I found some great options for **${data.expandedData.product_category}**. Here are the best deals sorted by price:`,
           buyData: data
         };
         setMessages(prev => [...prev, buyMessage]);
@@ -209,7 +209,7 @@ const Dashboard = ({ onLogout }) => {
                 <div dangerouslySetInnerHTML={{ __html: formatMessage(message.content) }} />
 
                 {/* TTS button for AI messages */}
-                {message.type === 'ai' && !message.buyData && (
+                {message.type === 'ai' && (
                   <button
                     className="tts-btn"
                     onClick={() => playTTS(message.id, message.content)}

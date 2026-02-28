@@ -1,17 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import LanguageSelector from '../components/LanguageSelector';
 import './Dashboard.css';
 
 const Dashboard = ({ onLogout }) => {
+  const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState([
     {
       id: 1,
       type: 'ai',
-      content: "Hello! I'm your AI assistant. I can help you find electronics, research products, or answer questions. What would you like to know?"
+      content: t('dashboard.greeting')
     }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [playingId, setPlayingId] = useState(null);
   const messagesEndRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -20,6 +27,13 @@ const Dashboard = ({ onLogout }) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Update greeting when language changes
+  useEffect(() => {
+    setMessages(prev => prev.map((msg, idx) =>
+      idx === 0 ? { ...msg, content: t('dashboard.greeting') } : msg
+    ));
+  }, [i18n.language, t]);
 
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -37,16 +51,13 @@ const Dashboard = ({ onLogout }) => {
     try {
       const response = await fetch('http://localhost:3001/api/search', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query: userMessage.content }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: userMessage.content, language: i18n.language }),
       });
 
       const data = await response.json();
 
       if (data.type === 'buy') {
-        // Handle buy response
         const buyMessage = {
           id: Date.now() + 1,
           type: 'ai',
@@ -55,7 +66,6 @@ const Dashboard = ({ onLogout }) => {
         };
         setMessages(prev => [...prev, buyMessage]);
       } else if (data.type === 'research') {
-        // Handle research response
         const researchMessage = {
           id: Date.now() + 1,
           type: 'ai',
@@ -64,7 +74,6 @@ const Dashboard = ({ onLogout }) => {
         };
         setMessages(prev => [...prev, researchMessage]);
       } else {
-        // Handle chat response
         const aiMessage = {
           id: Date.now() + 1,
           type: 'ai',
@@ -76,7 +85,7 @@ const Dashboard = ({ onLogout }) => {
       const errorMessage = {
         id: Date.now() + 1,
         type: 'ai',
-        content: 'Sorry, I encountered an error. Please try again.'
+        content: t('dashboard.error')
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -91,6 +100,81 @@ const Dashboard = ({ onLogout }) => {
     }
   };
 
+  // STT: Record audio and send to backend
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+        formData.append('language', i18n.language);
+
+        try {
+          const response = await fetch('http://localhost:5001/stt', {
+            method: 'POST',
+            body: formData,
+          });
+          const data = await response.json();
+          if (data.transcript) {
+            setInputValue(data.transcript);
+          }
+        } catch (err) {
+          console.error('STT error:', err);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Microphone access denied:', err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  // TTS: Play AI message as audio
+  const playTTS = async (messageId, text) => {
+    if (playingId === messageId) return;
+    setPlayingId(messageId);
+
+    try {
+      const response = await fetch('http://localhost:5001/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, language: i18n.language }),
+      });
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audio.onended = () => {
+        setPlayingId(null);
+        URL.revokeObjectURL(audioUrl);
+      };
+      audio.onerror = () => setPlayingId(null);
+      audio.play();
+    } catch (err) {
+      console.error('TTS error:', err);
+      setPlayingId(null);
+    }
+  };
+
   return (
     <div className="dashboard">
       <nav className="dashboard-navbar">
@@ -102,9 +186,12 @@ const Dashboard = ({ onLogout }) => {
           </div>
           <span className="dashboard-logo-text">ElectroFind</span>
         </div>
-        <button className="btn btn-secondary" onClick={onLogout}>
-          Log Out
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <LanguageSelector />
+          <button className="btn btn-secondary" onClick={onLogout}>
+            {t('nav.logout')}
+          </button>
+        </div>
       </nav>
 
       <main className="chat-container">
@@ -121,6 +208,18 @@ const Dashboard = ({ onLogout }) => {
               <div className="message-content">
                 <div dangerouslySetInnerHTML={{ __html: formatMessage(message.content) }} />
 
+                {/* TTS button for AI messages */}
+                {message.type === 'ai' && !message.buyData && (
+                  <button
+                    className="tts-btn"
+                    onClick={() => playTTS(message.id, message.content)}
+                    disabled={playingId === message.id}
+                    title="Listen"
+                  >
+                    {playingId === message.id ? '⏸' : '🔊'}
+                  </button>
+                )}
+
                 {/* Buy Results */}
                 {message.buyData && message.buyData.results && (
                   <div className="buy-results">
@@ -130,13 +229,7 @@ const Dashboard = ({ onLogout }) => {
                     </div>
                     <div className="buy-results-list">
                       {message.buyData.results.map((result) => (
-                        <a
-                          key={result.rank}
-                          href={result.buy_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="buy-result-card"
-                        >
+                        <a key={result.rank} href={result.buy_link} target="_blank" rel="noopener noreferrer" className="buy-result-card">
                           <div className="buy-result-rank">#{result.rank}</div>
                           <div className="buy-result-info">
                             <div className="buy-result-title">{result.product_title}</div>
@@ -149,7 +242,7 @@ const Dashboard = ({ onLogout }) => {
                     </div>
                     {message.buyData.expandedData.key_specs.length > 0 && (
                       <div className="buy-specs">
-                        <span className="buy-specs-label">Key specs:</span>
+                        <span className="buy-specs-label">{t('dashboard.keySpecs')}</span>
                         {message.buyData.expandedData.key_specs.map((spec, idx) => (
                           <span key={idx} className="buy-spec-tag">{spec}</span>
                         ))}
@@ -161,15 +254,9 @@ const Dashboard = ({ onLogout }) => {
                 {/* Research Sources */}
                 {message.sources && message.sources.length > 0 && (
                   <div className="sources">
-                    <p className="sources-title">Sources:</p>
+                    <p className="sources-title">{t('dashboard.sources')}</p>
                     {message.sources.map((source, idx) => (
-                      <a
-                        key={idx}
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="source-link"
-                      >
+                      <a key={idx} href={source.url} target="_blank" rel="noopener noreferrer" className="source-link">
                         {source.title}
                       </a>
                     ))}
@@ -187,9 +274,7 @@ const Dashboard = ({ onLogout }) => {
               </div>
               <div className="message-content">
                 <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
+                  <span></span><span></span><span></span>
                 </div>
               </div>
             </div>
@@ -204,9 +289,18 @@ const Dashboard = ({ onLogout }) => {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask about electronics, compare prices, or search for products..."
+              placeholder={t('dashboard.placeholder')}
               disabled={isLoading}
             />
+            <button
+              className={`mic-btn ${isRecording ? 'recording' : ''}`}
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onMouseLeave={stopRecording}
+              title="Hold to speak"
+            >
+              🎤
+            </button>
             <button
               className="send-btn"
               onClick={handleSend}
@@ -218,18 +312,15 @@ const Dashboard = ({ onLogout }) => {
               </svg>
             </button>
           </div>
-          <p className="input-hint">Press Enter to send • Try "best wireless earbuds under $100"</p>
+          <p className="input-hint">{t('dashboard.inputHint')}</p>
         </div>
       </main>
     </div>
   );
 };
 
-// Helper to format message content (simple markdown-like)
 function formatMessage(content) {
-  // Bold text
   let formatted = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  // Line breaks
   formatted = formatted.replace(/\n/g, '<br>');
   return formatted;
 }

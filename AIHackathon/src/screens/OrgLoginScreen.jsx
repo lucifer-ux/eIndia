@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import InputField from '../components/InputField';
 import SocialLoginButton from '../components/SocialLoginButton';
 import Navbar from '../components/Navbar';
@@ -6,6 +7,7 @@ import { sellerLoginWithEmail, sellerSignupWithEmail, sellerLoginWithGoogle, res
 import './LoginScreen.css';
 
 const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -34,13 +36,13 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
         onLoginSuccess(result.seller || result);
       }
     } catch (err) {
-      const msg = err.code === 'auth/user-not-found' ? 'No account found with this email'
-        : err.code === 'auth/wrong-password' ? 'Incorrect password'
-          : err.code === 'auth/email-already-in-use' ? 'An account with this email already exists'
-            : err.code === 'auth/weak-password' ? 'Password should be at least 6 characters'
-              : err.code === 'auth/invalid-email' ? 'Please enter a valid email address'
-                : err.code === 'auth/invalid-credential' ? 'Invalid email or password'
-                  : err.message || 'Authentication failed';
+      const msg = err.code === 'auth/user-not-found' ? t('error.noAccount')
+        : err.code === 'auth/wrong-password' ? t('error.wrongPassword')
+          : err.code === 'auth/email-already-in-use' ? t('error.emailInUse')
+            : err.code === 'auth/weak-password' ? t('error.weakPassword')
+              : err.code === 'auth/invalid-email' ? t('error.invalidEmail')
+                : err.code === 'auth/invalid-credential' ? t('error.invalidCredential')
+                  : err.message || t('error.authFailed');
       setError(msg);
     } finally {
       setLoading(false);
@@ -55,7 +57,7 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
       onLoginSuccess(result.seller || result);
     } catch (err) {
       if (err.code !== 'auth/popup-closed-by-user') {
-        setError(err.message || 'Google login failed');
+        setError(err.message || t('error.googleFailed'));
       }
     } finally {
       setLoading(false);
@@ -65,7 +67,7 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     if (!formData.email) {
-      setError('Please enter your email address first');
+      setError(t('login.enterEmailFirst'));
       return;
     }
     setLoading(true);
@@ -74,7 +76,7 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
       setResetSent(true);
       setError('');
     } catch (err) {
-      setError(err.message || 'Failed to send reset email');
+      setError(err.message || t('error.resetFailed'));
     } finally {
       setLoading(false);
     }
@@ -140,42 +142,42 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
             </div>
           </div>
 
-          <h1 className="login-title">{isSignup ? 'Create Organization Account' : 'Organization Login'}</h1>
-          <p className="login-subtitle">{isSignup ? 'Sign up your organization' : "Access your organization's dashboard"}</p>
+          <h1 className="login-title">{isSignup ? t('orgLogin.createTitle') : t('orgLogin.title')}</h1>
+          <p className="login-subtitle">{isSignup ? t('orgLogin.signupSubtitle') : t('orgLogin.subtitle')}</p>
 
           {error && <div className="login-error">{error}</div>}
-          {resetSent && <div className="login-success">Password reset email sent! Check your inbox.</div>}
+          {resetSent && <div className="login-success">{t('login.resetSent')}</div>}
 
           <form onSubmit={handleSubmit} className="login-form">
             <InputField
-              label="Organization Email"
+              label={t('orgLogin.emailLabel')}
               name="email"
               type="email"
-              placeholder="org@company.com"
+              placeholder={t('orgLogin.emailPlaceholder')}
               icon={<EmailIcon />}
               value={formData.email}
               onChange={handleChange}
             />
 
             <InputField
-              label="Password"
+              label={t('login.passwordLabel')}
               name="password"
               type="password"
-              placeholder="Enter your password"
+              placeholder={t('login.passwordPlaceholder')}
               icon={<LockIcon />}
-              rightElement={!isSignup ? <a href="#forgot" className="forgot-password-link" onClick={handleForgotPassword}>Forgot password?</a> : null}
+              rightElement={!isSignup ? <a href="#forgot" className="forgot-password-link" onClick={handleForgotPassword}>{t('login.forgotPassword')}</a> : null}
               value={formData.password}
               onChange={handleChange}
             />
 
             <button type="submit" className="login-submit-btn" disabled={loading}>
-              {loading ? 'Please wait...' : (isSignup ? 'Sign Up' : 'Continue')}
+              {loading ? t('login.pleaseWait') : (isSignup ? t('login.signUp') : t('login.continue'))}
             </button>
           </form>
 
           <div className="login-divider">
             <span className="divider-line"></span>
-            <span className="divider-text">OR CONTINUE WITH</span>
+            <span className="divider-text">{t('login.orContinueWith')}</span>
             <span className="divider-line"></span>
           </div>
 
@@ -190,10 +192,10 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
 
         <p className="login-footer">
           <button className="back-link" onClick={() => setIsSignup(!isSignup)}>
-            {isSignup ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
+            {isSignup ? t('login.alreadyHaveAccount') : t('login.dontHaveAccount')}
           </button>
           <button className="back-link" onClick={onBackToHome}>
-            ← Back to Home
+            {t('login.backToHome')}
           </button>
         </p>
       </div>

@@ -110,10 +110,18 @@ Enhanced Query:`;
 // Chat response prompt
 const CHAT_PROMPT = `You are a helpful AI assistant for ElectroFind, an electronics discovery platform. 
 Answer the user's question concisely and helpfully.
+{langInstruction}
 
 User: {query}
 
 Assistant:`;
+
+// Language instruction map
+const LANG_NAMES = {
+  hi: 'Hindi (हिन्दी)', kn: 'Kannada (ಕನ್ನಡ)', te: 'Telugu (తెలుగు)',
+  pa: 'Punjabi (ਪੰਜਾਬੀ)', mr: 'Marathi (मराठी)', ta: 'Tamil (தமிழ்)',
+  en: 'English'
+};
 
 // Check intent using OpenAI
 async function checkIntent(query) {
@@ -213,8 +221,11 @@ async function enhanceQuery(query) {
 }
 
 // Get chat response from OpenAI
-async function getChatResponse(query) {
-  const prompt = CHAT_PROMPT.replace('{query}', query);
+async function getChatResponse(query, language = 'en') {
+  const langInstruction = language !== 'en' && LANG_NAMES[language]
+    ? `IMPORTANT: You MUST respond in ${LANG_NAMES[language]}. Do not respond in English.`
+    : '';
+  const prompt = CHAT_PROMPT.replace('{query}', query).replace('{langInstruction}', langInstruction);
 
   try {
     const stream = await openai.responses.create({
@@ -335,7 +346,7 @@ async function performResearch(query) {
 
 // Search endpoint
 app.post('/api/search', async (req, res) => {
-  const { query } = req.body;
+  const { query, language } = req.body;
 
   if (!query || !query.trim()) {
     return res.status(400).json({ error: 'Query is required' });
@@ -350,7 +361,7 @@ app.post('/api/search', async (req, res) => {
 
     if (intent === 'CHAT') {
       // Handle chat
-      const response = await getChatResponse(query);
+      const response = await getChatResponse(query, language || 'en');
       return res.json({
         type: 'chat',
         response: response,

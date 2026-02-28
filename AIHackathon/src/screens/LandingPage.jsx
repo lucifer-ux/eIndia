@@ -1,11 +1,14 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import Navbar from '../components/Navbar';
 import HeroSection from '../components/HeroSection';
 import TrustedBy from '../components/TrustedBy';
 import Footer from '../components/Footer';
+import LanguageSelector from '../components/LanguageSelector';
 import './LandingPage.css';
 
 const LandingPage = ({ onLoginAsUser, onLoginAsOrg }) => {
+  const { t } = useTranslation();
   // Icons as SVG components
   const LightningIcon = () => (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
@@ -60,28 +63,29 @@ const LandingPage = ({ onLoginAsUser, onLoginAsOrg }) => {
         logoIcon={<LightningIcon />}
         logoText="ElectroFind"
         showAuthButtons={false}
+        rightElement={<LanguageSelector />}
       />
-      
+
       <main className="landing-main">
         <HeroSection
-          badgeText="AI-DRIVEN DISCOVERY"
-          headline="Find the best "
-          headlineHighlight="electronics, instantly."
-          subtext="Connect with verified organizations and discover AI-driven electronics solutions tailored to your specific needs."
+          badgeText={t('hero.badge')}
+          headline={t('hero.headline')}
+          headlineHighlight={t('hero.highlight')}
+          subtext={t('hero.subtext')}
           primaryButton={{
-            text: "Login as User",
+            text: t('hero.loginUser'),
             icon: <UserIcon />,
             onClick: onLoginAsUser
           }}
           secondaryButton={{
-            text: "Login as Org",
+            text: t('hero.loginOrg'),
             icon: <BuildingIcon />,
             onClick: onLoginAsOrg
           }}
         />
-        
+
         <TrustedBy
-          title="Trusted by leading tech firms"
+          title={t('trusted.title')}
           companies={[
             { logo: <div style={{ width: 80, height: 24, background: 'rgba(255,255,255,0.1)', borderRadius: 4 }} /> },
             { logo: <div style={{ width: 80, height: 24, background: 'rgba(255,255,255,0.1)', borderRadius: 4 }} /> },
@@ -89,21 +93,21 @@ const LandingPage = ({ onLoginAsUser, onLoginAsOrg }) => {
           ]}
         />
       </main>
-      
+
       <Footer
         logoIcon={<LightningIcon />}
         companyName="ElectroFind Inc."
         links={[
-          { text: 'Privacy Policy', href: '#privacy' },
-          { text: 'Terms of Service', href: '#terms' },
-          { text: 'Contact Support', href: '#support' }
+          { text: t('footer.privacy'), href: '#privacy' },
+          { text: t('footer.terms'), href: '#terms' },
+          { text: t('footer.support'), href: '#support' }
         ]}
         socialIcons={[
           { icon: <AtIcon />, href: '#twitter' },
           { icon: <BriefcaseIcon />, href: '#linkedin' },
           { icon: <CameraIcon />, href: '#instagram' }
         ]}
-        copyrightText="© 2023 ElectroFind. All rights reserved."
+        copyrightText={t('footer.copyright')}
       />
     </div>
   );

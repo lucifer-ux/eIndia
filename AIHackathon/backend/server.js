@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const { BedrockRuntimeClient, InvokeModelCommand } = require('@aws-sdk/client-bedrock-runtime');
-const { TavilyClient } = require('@tavily/core');
+const OpenAI = require('openai');
+const { tavily } = require('@tavily/core');
 require('dotenv').config();
 
 const app = express();
@@ -11,16 +11,16 @@ const port = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// Initialize clients
-const bedrockClient = new BedrockRuntimeClient({
-  region: process.env.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL,
 });
 
-const tavilyClient = new TavilyClient(process.env.TAVILY_API_KEY);
+// Initialize Tavily client
+const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
+
+const MODEL = 'openai.gpt-oss-120b';
 
 // Intent checking prompt
 const INTENT_CHECK_PROMPT = `You are an AI assistant that determines user intent. Analyze the following query and determine if the user is:
@@ -50,31 +50,28 @@ User: {query}
 
 Assistant:`;
 
-// Check intent using Bedrock
+// Check intent using OpenAI
 async function checkIntent(query) {
   const prompt = INTENT_CHECK_PROMPT.replace('{query}', query);
   
-  const command = new InvokeModelCommand({
-    modelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
-    contentType: 'application/json',
-    accept: 'application/json',
-    body: JSON.stringify({
-      anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: 10,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    }),
-  });
-
   try {
-    const response = await bedrockClient.send(command);
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const intent = responseBody.content[0].text.trim().toUpperCase();
-    return intent === 'RESEARCH' ? 'RESEARCH' : 'CHAT';
+    const stream = await openai.responses.create({
+      model: MODEL,
+      input: [
+        { role: 'user', content: prompt }
+      ],
+      stream: true,
+    });
+
+    let intent = '';
+    for await (const event of stream) {
+      if (event.type === 'response.output_text.delta') {
+        intent += event.delta;
+      }
+    }
+
+    const cleanIntent = intent.trim().toUpperCase();
+    return cleanIntent === 'RESEARCH' ? 'RESEARCH' : 'CHAT';
   } catch (error) {
     console.error('Error checking intent:', error);
     return 'CHAT'; // Default to chat on error
@@ -85,56 +82,50 @@ async function checkIntent(query) {
 async function enhanceQuery(query) {
   const prompt = ENHANCE_PROMPT.replace('{query}', query);
   
-  const command = new InvokeModelCommand({
-    modelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
-    contentType: 'application/json',
-    accept: 'application/json',
-    body: JSON.stringify({
-      anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: 500,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    }),
-  });
-
   try {
-    const response = await bedrockClient.send(command);
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    return responseBody.content[0].text.trim();
+    const stream = await openai.responses.create({
+      model: MODEL,
+      input: [
+        { role: 'user', content: prompt }
+      ],
+      stream: true,
+    });
+
+    let enhancedQuery = '';
+    for await (const event of stream) {
+      if (event.type === 'response.output_text.delta') {
+        enhancedQuery += event.delta;
+      }
+    }
+
+    return enhancedQuery.trim();
   } catch (error) {
     console.error('Error enhancing query:', error);
     return query; // Return original query on error
   }
 }
 
-// Get chat response from Bedrock
+// Get chat response from OpenAI
 async function getChatResponse(query) {
   const prompt = CHAT_PROMPT.replace('{query}', query);
   
-  const command = new InvokeModelCommand({
-    modelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
-    contentType: 'application/json',
-    accept: 'application/json',
-    body: JSON.stringify({
-      anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: 1000,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    }),
-  });
-
   try {
-    const response = await bedrockClient.send(command);
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    return responseBody.content[0].text.trim();
+    const stream = await openai.responses.create({
+      model: MODEL,
+      input: [
+        { role: 'user', content: prompt }
+      ],
+      stream: true,
+    });
+
+    let response = '';
+    for await (const event of stream) {
+      if (event.type === 'response.output_text.delta') {
+        response += event.delta;
+      }
+    }
+
+    return response.trim();
   } catch (error) {
     console.error('Error getting chat response:', error);
     throw error;

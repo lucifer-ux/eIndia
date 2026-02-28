@@ -1,10 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Dashboard.css';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 const Dashboard = ({ onLogout }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [conversations, setConversations] = useState([]);
   const textareaRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
@@ -19,10 +24,65 @@ const Dashboard = ({ onLogout }) => {
     adjustTextareaHeight();
   }, [searchQuery]);
 
-  const handleSearch = (e) => {
+  useEffect(() => {
+    // Scroll to bottom of chat when new message added
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [conversations]);
+
+  const handleSearch = async (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      console.log('Searching for:', searchQuery);
+    if (!searchQuery.trim()) return;
+
+    const userMessage = searchQuery.trim();
+    setIsLoading(true);
+    
+    // Add user message to conversation
+    const newConversation = {
+      id: Date.now(),
+      type: 'user',
+      content: userMessage,
+      timestamp: new Date().toISOString()
+    };
+    setConversations(prev => [...prev, newConversation]);
+    setSearchQuery('');
+
+    try {
+      const response = await fetch(`${API_URL}/api/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: userMessage }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+
+      const data = await response.json();
+      
+      // Add AI response to conversation
+      const aiResponse = {
+        id: Date.now() + 1,
+        type: 'ai',
+        content: data.type === 'chat' ? data.response : data.answer,
+        data: data,
+        timestamp: new Date().toISOString()
+      };
+      setConversations(prev => [...prev, aiResponse]);
+    } catch (err) {
+      // Add error message
+      const errorResponse = {
+        id: Date.now() + 1,
+        type: 'error',
+        content: 'Sorry, I encountered an error. Please try again.',
+        timestamp: new Date().toISOString()
+      };
+      setConversations(prev => [...prev, errorResponse]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -32,20 +92,12 @@ const Dashboard = ({ onLogout }) => {
 
   const handleSuggestionClick = (suggestion) => {
     setSearchQuery(suggestion);
-    console.log('Searching for:', suggestion);
   };
 
   // Icons
   const LightningIcon = () => (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
       <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-    </svg>
-  );
-
-  const SearchIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8"></circle>
-      <path d="m21 21-4.35-4.35"></path>
     </svg>
   );
 
@@ -76,6 +128,19 @@ const Dashboard = ({ onLogout }) => {
       <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
       <line x1="8" y1="21" x2="16" y2="21"></line>
       <line x1="12" y1="17" x2="12" y2="21"></line>
+    </svg>
+  );
+
+  const UserIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+      <circle cx="12" cy="7" r="4"></circle>
+    </svg>
+  );
+
+  const AIIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
     </svg>
   );
 
@@ -117,46 +182,104 @@ const Dashboard = ({ onLogout }) => {
       </nav>
 
       <main className="dashboard-main">
-        <h1 className="dashboard-headline">
-          Find your next <span className="highlight">electronic gadget</span>
-        </h1>
-
-        <div className={`search-container ${isFocused ? 'focused' : ''} ${searchQuery ? 'has-content' : ''}`}>
-          <form onSubmit={handleSearch} className="search-form">
-            <div className="search-input-wrapper">
-              <textarea
-                ref={textareaRef}
-                className="search-textarea"
-                placeholder="Ask anything... e.g., 'Best noise-cancelling headphones under $200'"
-                value={searchQuery}
-                onChange={handleChange}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                rows={1}
-              />
-            </div>
-            {(searchQuery || isFocused) && (
-              <div className="search-actions">
-                <button type="submit" className="search-submit-btn">
-                  <ArrowIcon />
-                  <span>Search</span>
-                </button>
+        {/* Conversation/Chat Area */}
+        <div className="chat-container" ref={chatContainerRef}>
+          {conversations.length === 0 ? (
+            <h1 className="dashboard-headline">
+              Find your next <span className="highlight">electronic gadget</span>
+            </h1>
+          ) : (
+            conversations.map((conv) => (
+              <div key={conv.id} className={`chat-message ${conv.type}`}>
+                <div className="message-avatar">
+                  {conv.type === 'user' ? <UserIcon /> : conv.type === 'ai' ? <AIIcon /> : '⚠️'}
+                </div>
+                <div className="message-content">
+                  {conv.type === 'ai' && conv.data?.type === 'research' && conv.data.sources?.length > 0 ? (
+                    <div className="research-response">
+                      <p>{conv.content}</p>
+                      <div className="sources">
+                        <h4>Sources</h4>
+                        <ul>
+                          {conv.data.sources.map((source, index) => (
+                            <li key={index}>
+                              <a href={source.url} target="_blank" rel="noopener noreferrer">
+                                {source.title}
+                              </a>
+                              <p>{source.content?.substring(0, 150)}...</p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ) : (
+                    <p>{conv.content}</p>
+                  )}
+                </div>
               </div>
-            )}
-          </form>
+            ))
+          )}
+          {isLoading && (
+            <div className="chat-message ai loading">
+              <div className="message-avatar"><AIIcon /></div>
+              <div className="message-content">
+                <div className="typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="suggestions">
-          {suggestions.map((suggestion, index) => (
-            <button
-              key={index}
-              className="suggestion-chip"
-              onClick={() => handleSuggestionClick(suggestion.text)}
-            >
-              <span className="suggestion-icon">{suggestion.icon}</span>
-              {suggestion.text}
-            </button>
-          ))}
+        {/* Search Box - Fixed at Bottom */}
+        <div className="search-wrapper">
+          {!conversations.length > 0 && (
+            <div className="suggestions">
+              {suggestions.map((suggestion, index) => (
+                <button
+                  key={index}
+                  className="suggestion-chip"
+                  onClick={() => handleSuggestionClick(suggestion.text)}
+                >
+                  <span className="suggestion-icon">{suggestion.icon}</span>
+                  {suggestion.text}
+                </button>
+              ))}
+            </div>
+          )}
+          
+          <div className={`search-container ${isFocused ? 'focused' : ''} ${searchQuery ? 'has-content' : ''}`}>
+            <form onSubmit={handleSearch} className="search-form">
+              <div className="search-input-wrapper">
+                <textarea
+                  ref={textareaRef}
+                  className="search-textarea"
+                  placeholder="Ask anything... e.g., 'Best noise-cancelling headphones under $200'"
+                  value={searchQuery}
+                  onChange={handleChange}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  rows={1}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="search-actions">
+                <button 
+                  type="submit" 
+                  className="search-submit-btn"
+                  disabled={isLoading || !searchQuery.trim()}
+                >
+                  {isLoading ? (
+                    <span className="loading-spinner">Loading...</span>
+                  ) : (
+                    <ArrowIcon />
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </main>
     </div>

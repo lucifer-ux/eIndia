@@ -3,6 +3,8 @@ import './OrgDashboard.css';
 
 const OrgDashboard = ({ onLogout }) => {
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
+  const [promptText, setPromptText] = useState(`Act as a senior technical sales engineer for ElectroFind. Your goal is to assist engineers and procurement managers in finding the right electronic components. Always verify stock availability before making commitments. Provide accurate technical specifications and competitive pricing. Be professional, helpful, and concise in your responses.`);
   const [isAgentActive, setIsAgentActive] = useState(true);
 
   // Mock data
@@ -47,7 +49,21 @@ const OrgDashboard = ({ onLogout }) => {
     { name: 'Arduino Uno R3', queries: 980, percentage: 65 }
   ];
 
-  const defaultPrompt = `Act as a senior technical sales engineer for ElectroFind. Your goal is to assist engineers and procurement managers in finding the right electronic components. Always verify stock availability before making commitments. Provide accurate technical specifications and competitive pricing. Be professional, helpful, and concise in your responses.`;
+  const handleEditPrompt = () => {
+    setIsEditingPrompt(true);
+    setIsPromptExpanded(true);
+  };
+
+  const handleUpdateAgent = () => {
+    setIsEditingPrompt(false);
+    // In a real app, you would save to backend here
+    console.log('Prompt updated:', promptText);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingPrompt(false);
+    // Reset to original or keep changes - here we'll keep changes since it's UI only
+  };
 
   return (
     <div className="org-dashboard">
@@ -241,17 +257,41 @@ const OrgDashboard = ({ onLogout }) => {
 
               <div className="prompt-section">
                 <label className="prompt-label">DEFAULT INITIAL PROMPT</label>
-                <div 
-                  className={`prompt-box ${isPromptExpanded ? 'expanded' : ''}`}
-                  onClick={() => setIsPromptExpanded(!isPromptExpanded)}
-                >
-                  <p>{defaultPrompt}</p>
-                  {!isPromptExpanded && <div className="prompt-fade"></div>}
-                </div>
-                {isPromptExpanded && (
-                  <div className="prompt-actions">
-                    <button className="btn btn-secondary btn-sm">Edit Prompt</button>
+                
+                {isEditingPrompt ? (
+                  <div className="prompt-edit-container">
+                    <textarea
+                      className="prompt-textarea"
+                      value={promptText}
+                      onChange={(e) => setPromptText(e.target.value)}
+                      rows={8}
+                    />
+                    <div className="prompt-edit-actions">
+                      <button className="btn btn-secondary btn-sm" onClick={handleCancelEdit}>
+                        Cancel
+                      </button>
+                      <button className="btn btn-primary btn-sm" onClick={handleUpdateAgent}>
+                        Save Changes
+                      </button>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    <div 
+                      className={`prompt-box ${isPromptExpanded ? 'expanded' : ''}`}
+                      onClick={() => setIsPromptExpanded(!isPromptExpanded)}
+                    >
+                      <p>{promptText}</p>
+                      {!isPromptExpanded && <div className="prompt-fade"></div>}
+                    </div>
+                    {isPromptExpanded && (
+                      <div className="prompt-actions">
+                        <button className="btn btn-secondary btn-sm" onClick={handleEditPrompt}>
+                          Edit Prompt
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -267,7 +307,7 @@ const OrgDashboard = ({ onLogout }) => {
                   </label>
                   <span className="toggle-label">{isAgentActive ? 'Active' : 'Inactive'}</span>
                 </div>
-                <button className="btn btn-primary btn-sm">
+                <button className="btn btn-primary btn-sm" onClick={handleUpdateAgent}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="12" y1="8" x2="12" y2="16"></line>

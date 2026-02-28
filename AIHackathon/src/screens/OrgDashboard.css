@@ -479,6 +479,38 @@
   margin-top: 1rem;
 }
 
+.prompt-edit-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.prompt-textarea {
+  width: 100%;
+  min-height: 150px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  color: #ffffff;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  resize: vertical;
+  font-family: inherit;
+  outline: none;
+}
+
+.prompt-textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.prompt-edit-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
 .agent-controls {
   display: flex;
   justify-content: space-between;

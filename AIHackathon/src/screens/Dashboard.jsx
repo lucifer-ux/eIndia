@@ -734,6 +734,14 @@ const Dashboard = ({ onLogout, onStartSellerChat, user }) => {
                                     className="btn-chat-to-buy"
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      // Track query count for seller
+                                      if (result.storeId) {
+                                        fetch(`${API_URL}/api/seller/stats/query`, {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ sellerId: result.storeId })
+                                        }).catch(err => console.error('Failed to track query:', err));
+                                      }
                                       onStartSellerChat && onStartSellerChat(result);
                                     }}
                                   >
@@ -747,7 +755,17 @@ const Dashboard = ({ onLogout, onStartSellerChat, user }) => {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="btn-view-details"
-                                    onClick={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      // Track query count for seller when viewing details
+                                      if (result.storeId) {
+                                        fetch(`${API_URL}/api/seller/stats/query`, {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ sellerId: result.storeId })
+                                        }).catch(err => console.error('Failed to track query:', err));
+                                      }
+                                    }}
                                   >
                                     View Details →
                                   </a>

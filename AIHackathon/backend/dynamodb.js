@@ -15,6 +15,7 @@ const docClient = DynamoDBDocumentClient.from(client);
 const USER_TABLE = process.env.DYNAMODB_USER_TABLE || 'user-table';
 const SELLER_TABLE = process.env.DYNAMODB_SELLER_TABLE || 'seller-table';
 const USER_CHAT_TABLE = process.env.DYNAMODB_USER_CHAT_TABLE || 'user-chat';
+const SELLER_USER_CHAT_TABLE = process.env.DYNAMODB_SELLER_USER_CHAT_TABLE || 'seller-user-chat';
 
 /**
  * Upsert a user record in user-table after successful Firebase auth
@@ -78,6 +79,65 @@ async function incrementSellerOrder(sellerId, orderAmount) {
             ':inc': 1,
             ':amount': orderAmount || 0,
             ':zero': 0,
+            ':now': new Date().toISOString(),
+        },
+        ReturnValues: 'ALL_NEW',
+    };
+    
+    const result = await docClient.send(new UpdateCommand(params));
+    return result.Attributes;
+}
+
+/**
+ * Increment seller's total queries count (product tile clicks)
+ */
+async function incrementTotalQueries(sellerId) {
+    const params = {
+        TableName: SELLER_TABLE,
+        Key: { sellerId },
+        UpdateExpression: 'SET totalQueries = if_not_exists(totalQueries, :zero) + :inc, updatedAt = :now',
+        ExpressionAttributeValues: {
+            ':inc': 1,
+            ':zero': 0,
+            ':now': new Date().toISOString(),
+        },
+        ReturnValues: 'ALL_NEW',
+    };
+    
+    const result = await docClient.send(new UpdateCommand(params));
+    return result.Attributes;
+}
+
+/**
+ * Increment seller's resolved queries count (WhatsApp notifications sent)
+ */
+async function incrementResolvedQueries(sellerId) {
+    const params = {
+        TableName: SELLER_TABLE,
+        Key: { sellerId },
+        UpdateExpression: 'SET resolvedQueries = if_not_exists(resolvedQueries, :zero) + :inc, updatedAt = :now',
+        ExpressionAttributeValues: {
+            ':inc': 1,
+            ':zero': 0,
+            ':now': new Date().toISOString(),
+        },
+        ReturnValues: 'ALL_NEW',
+    };
+    
+    const result = await docClient.send(new UpdateCommand(params));
+    return result.Attributes;
+}
+
+/**
+ * Update seller's AI prompt
+ */
+async function updateSellerPrompt(sellerId, prompt) {
+    const params = {
+        TableName: SELLER_TABLE,
+        Key: { sellerId },
+        UpdateExpression: 'SET sellerPrompt = :prompt, updatedAt = :now',
+        ExpressionAttributeValues: {
+            ':prompt': prompt,
             ':now': new Date().toISOString(),
         },
         ReturnValues: 'ALL_NEW',
@@ -265,6 +325,171 @@ async function deleteAllUserChats(userId) {
     return { success: true, deletedCount: chats.length };
 }
 
+// ═══════════════════════════════════════
+// SELLER-USER CHAT OPERATIONS (for Org Dashboard)
+// ═══════════════════════════════════════
+
+/**
+ * Create or update a seller-user conversation
+ */
+async function saveSellerUserChat({ 
+    sellerId, 
+    userEmail, 
+    sessionId, 
+    productData, 
+    messages, 
+    status = 'active',
+    extractedInfo = null,
+    whatsappNotified = false 
+}) {
+    const now = new Date().toISOString();
+    const chatId = `${sellerId}#${userEmail}#${sessionId}`;
+    
+    const params = {
+        TableName: SELLER_USER_CHAT_TABLE,
+        Item: {
+            chatId,
+            sellerId,
+            userEmail,
+            sessionId,
+            productData: productData || {},
+            messages: messages || [],
+            status,
+            extractedInfo: extractedInfo || {},
+            whatsappNotified,
+            createdAt: now,
+            updatedAt: now,
+        },
+    };
+
+    await docClient.send(new PutCommand(params));
+    return params.Item;
+}
+
+/**
+ * Get all conversations for a seller (sorted by updatedAt descending)
+ */
+async function getSellerConversations(sellerId) {
+    const params = {
+        TableName: SELLER_USER_CHAT_TABLE,
+        FilterExpression: 'sellerId = :sellerId',
+        ExpressionAttributeValues: {
+            ':sellerId': sellerId,
+        },
+    };
+
+    const result = await docClient.send(new ScanCommand(params));
+    // Sort by updatedAt descending (most recent first)
+    const conversations = (result.Items || []).sort((a, b) =>
+        new Date(b.updatedAt) - new Date(a.updatedAt)
+    );
+    return conversations;
+}
+
+/**
+ * Get a specific conversation by chatId
+ */
+async function getSellerUserChat(chatId) {
+    const params = {
+        TableName: SELLER_USER_CHAT_TABLE,
+        Key: { chatId },
+    };
+
+    const result = await docClient.send(new GetCommand(params));
+    return result.Item || null;
+}
+
+/**
+ * Update conversation messages and metadata
+ */
+async function updateSellerUserChat({ 
+    chatId, 
+    messages, 
+    status, 
+    extractedInfo, 
+    whatsappNotified 
+}) {
+    const now = new Date().toISOString();
+    let updateExpression = 'SET updatedAt = :now';
+    const expressionAttributeValues = { ':now': now };
+    const expressionAttributeNames = {};
+
+    if (messages !== undefined) {
+        updateExpression += ', messages = :messages';
+        expressionAttributeValues[':messages'] = messages;
+    }
+
+    if (status !== undefined) {
+        updateExpression += ', #status = :status';
+        expressionAttributeValues[':status'] = status;
+        expressionAttributeNames['#status'] = 'status';
+    }
+
+    if (extractedInfo !== undefined) {
+        updateExpression += ', extractedInfo = :extractedInfo';
+        expressionAttributeValues[':extractedInfo'] = extractedInfo;
+    }
+
+    if (whatsappNotified !== undefined) {
+        updateExpression += ', whatsappNotified = :whatsappNotified';
+        expressionAttributeValues[':whatsappNotified'] = whatsappNotified;
+    }
+
+    const params = {
+        TableName: SELLER_USER_CHAT_TABLE,
+        Key: { chatId },
+        UpdateExpression: updateExpression,
+        ExpressionAttributeValues: expressionAttributeValues,
+        ReturnValues: 'ALL_NEW',
+    };
+
+    if (Object.keys(expressionAttributeNames).length > 0) {
+        params.ExpressionAttributeNames = expressionAttributeNames;
+    }
+
+    const result = await docClient.send(new UpdateCommand(params));
+    return result.Attributes;
+}
+
+/**
+ * Update conversation status
+ */
+async function updateConversationStatus(chatId, status) {
+    return updateSellerUserChat({ chatId, status });
+}
+
+/**
+ * Delete a conversation
+ */
+async function deleteSellerUserChat(chatId) {
+    const params = {
+        TableName: SELLER_USER_CHAT_TABLE,
+        Key: { chatId },
+    };
+
+    await docClient.send(new DeleteCommand(params));
+    return { success: true, chatId };
+}
+
+/**
+ * Get conversations by user email
+ */
+async function getUserConversations(userEmail) {
+    const params = {
+        TableName: SELLER_USER_CHAT_TABLE,
+        FilterExpression: 'userEmail = :userEmail',
+        ExpressionAttributeValues: {
+            ':userEmail': userEmail,
+        },
+    };
+
+    const result = await docClient.send(new ScanCommand(params));
+    const conversations = (result.Items || []).sort((a, b) =>
+        new Date(b.updatedAt) - new Date(a.updatedAt)
+    );
+    return conversations;
+}
+
 module.exports = {
     upsertUser,
     upsertSeller,
@@ -273,11 +498,22 @@ module.exports = {
     setUserLoggedOut,
     setSellerLoggedOut,
     incrementSellerOrder,
-    // Chat operations
+    incrementTotalQueries,
+    incrementResolvedQueries,
+    updateSellerPrompt,
+    // User chat operations
     createChat,
     getUserChats,
     getChat,
     updateChat,
     deleteChat,
     deleteAllUserChats,
+    // Seller-user chat operations
+    saveSellerUserChat,
+    getSellerConversations,
+    getSellerUserChat,
+    updateSellerUserChat,
+    updateConversationStatus,
+    deleteSellerUserChat,
+    getUserConversations,
 };

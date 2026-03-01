@@ -9,8 +9,58 @@ const SellerChat = ({ productData, userData, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [isStarting, setIsStarting] = useState(true);
+  const [notificationSent, setNotificationSent] = useState(false);
+  const [chatId, setChatId] = useState(null);
+  const [extractedInfo, setExtractedInfo] = useState({});
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+
+  // Get seller info from product data
+  const sellerId = productData.storeId || 'demo-seller-001';
+  const userEmail = userData?.email || 'anonymous@user.com';
+
+  // Save conversation to DynamoDB
+  const saveConversationToDB = async (updatedMessages, status = 'active', extractedData = null, notified = false) => {
+    try {
+      const chatId = `${sellerId}#${userEmail}#${sessionId}`;
+      const payload = {
+        sellerId,
+        userEmail,
+        sessionId,
+        productData: {
+          product_title: productData.product_title,
+          price: productData.price,
+          store: productData.store,
+          sku: productData.sku || 'N/A'
+        },
+        messages: updatedMessages.map(m => ({
+          role: m.type === 'user' ? 'Customer' : 'Bot',
+          content: m.content,
+          timestamp: m.timestamp
+        })),
+        status: status,
+        whatsappNotified: notified
+      };
+
+      // Add extracted info if available
+      if (extractedData || Object.keys(extractedInfo).length > 0) {
+        payload.extractedInfo = extractedData || extractedInfo;
+      }
+
+      const response = await fetch(`${API_URL}/api/seller-user-chat/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        console.log('[SellerChat] Conversation saved to DB');
+      }
+    } catch (error) {
+      console.error('[SellerChat] Error saving conversation:', error);
+    }
+  };
 
   // Initialize chat session on mount
   useEffect(() => {
@@ -53,6 +103,11 @@ const SellerChat = ({ productData, userData, onClose }) => {
           };
           
           setMessages([welcomeMessage]);
+          
+          // Save initial conversation to DB
+          setTimeout(() => {
+            saveConversationToDB([welcomeMessage]);
+          }, 0);
         }
       } catch (error) {
         console.error('Failed to start chat session:', error);
@@ -166,6 +221,16 @@ const SellerChat = ({ productData, userData, onClose }) => {
       };
 
       setMessages(prev => [...prev, sellerResponse]);
+
+      // Save conversation to DB after each exchange
+      const updatedMessages = [...messages, userMessage, sellerResponse];
+      saveConversationToDB(updatedMessages);
+
+      // Send every user message to backend for LLM-based intent analysis
+      if (!notificationSent) {
+        console.log('[SellerChat] Analyzing message with LLM...');
+        await analyzeAndNotify(userMessage.content, updatedMessages);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       
@@ -194,6 +259,128 @@ const SellerChat = ({ productData, userData, onClose }) => {
   const handleQuickAction = (action) => {
     setInputValue(action);
     setTimeout(() => handleSend(), 100);
+  };
+
+  // Analyze message with LLM and send notification if needed
+  const analyzeAndNotify = async (triggerMessage) => {
+    try {
+      const sellerId = productData.storeId || 'demo-seller-001';
+      
+      // Build full conversation history
+      const fullConversation = messages.map(m => ({
+        role: m.type === 'user' ? 'Customer' : 'Bot',
+        content: m.content
+      }));
+
+      const response = await fetch(`${API_URL}/api/seller/chat/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sellerId,
+          sessionId,
+          triggerMessage,
+          conversationHistory: fullConversation,
+          productInfo: {
+            name: productData.product_title,
+            price: productData.price,
+            sku: productData.sku || 'N/A'
+          },
+          userInfo: {
+            name: userData?.name || 'Customer',
+            location: userData?.location || 'Not specified'
+          }
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.shouldNotify && !notificationSent) {
+        console.log('[SellerChat] LLM detected intent! Sending WhatsApp notification...');
+        await sendWhatsAppNotification(data.extractedInfo);
+      }
+    } catch (error) {
+      console.error('[SellerChat] Error analyzing message:', error);
+    }
+  };
+
+  // Send WhatsApp notification to seller
+  const sendWhatsAppNotification = async (extractedInfo) => {
+    try {
+      const sellerId = productData.storeId || 'demo-seller-001';
+      
+      // Build conversation summary from recent messages
+      const recentMessages = messages.slice(-6).map(m => ({
+        role: m.type === 'user' ? 'Customer' : 'Bot',
+        content: m.content
+      }));
+
+      const response = await fetch(`${API_URL}/api/seller/chat/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sellerId,
+          sessionId,
+          conversationHistory: recentMessages,
+          extractedInfo,
+          productInfo: {
+            name: productData.product_title,
+            price: productData.price,
+            sku: productData.sku || 'N/A'
+          },
+          userInfo: {
+            name: userData?.name || 'Customer',
+            location: userData?.location || 'Not specified'
+          }
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('[SellerChat] WhatsApp notification sent successfully');
+        setNotificationSent(true);
+        
+        // Track resolved query for seller
+        try {
+          await fetch(`${API_URL}/api/seller/stats/resolved`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sellerId })
+          });
+          console.log('[SellerChat] Resolved query tracked for seller:', sellerId);
+        } catch (statsError) {
+          console.error('[SellerChat] Failed to track resolved query:', statsError);
+        }
+        
+        // Save to DB with notified status
+        const updatedMessages = [...messages];
+        saveConversationToDB(updatedMessages, 'active', extractedInfo, true);
+        
+        // Show confirmation to user with dashboard login prompt
+        const confirmationMessage = {
+          id: Date.now() + 100,
+          type: 'seller',
+          sender: productData.store || 'Seller Support',
+          content: extractedInfo?.wantsHuman 
+            ? "I've notified the seller. Someone will reach out to you shortly! You can also track your inquiry at https://eindia.duckdns.org/"
+            : "I've notified the seller about your interest. They'll follow up with you soon! Track your inquiry at https://eindia.duckdns.org/",
+          timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          isFirstInGroup: true,
+          isNotification: true
+        };
+        
+        setMessages(prev => [...prev, confirmationMessage]);
+        
+        // Save again with the confirmation message and notified status
+        setTimeout(() => {
+          saveConversationToDB([...updatedMessages, confirmationMessage], 'active', extractedInfo, true);
+        }, 0);
+      } else {
+        console.error('[SellerChat] Failed to send notification:', data.error);
+      }
+    } catch (error) {
+      console.error('[SellerChat] Error sending WhatsApp notification:', error);
+    }
   };
 
   // Group messages by sender for styling
@@ -337,7 +524,7 @@ const SellerChat = ({ productData, userData, onClose }) => {
                       <span>{message.sender}</span>
                     </div>
                   )}
-                  <div className={`message-bubble ${group.type}`}>
+                  <div className={`message-bubble ${group.type} ${message.isNotification ? 'notification' : ''}`}>
                     {message.content}
                   </div>
                 </React.Fragment>

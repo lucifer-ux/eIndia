@@ -640,9 +640,711 @@
 
 .demand-bar-fill {
   height: 100%;
-  background-color: #3b82f6;
-  border-radius: 3px;
-  transition: width 0.5s ease;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* ═══════════════════════════════════════
+   WHATSAPP INTEGRATION STYLES
+   ═══════════════════════════════════════ */
+
+.whatsapp-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.whatsapp-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.whatsapp-header svg {
+  color: #25d366;
+}
+
+.whatsapp-header h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.whatsapp-subtitle {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 1rem;
+}
+
+.whatsapp-status {
+  margin-bottom: 1rem;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.status-indicator .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.status-indicator.disconnected .status-dot {
+  background: #ef4444;
+}
+
+.status-indicator.connecting .status-dot {
+  background: #f59e0b;
+  animation: pulse 1.5s infinite;
+}
+
+.status-indicator.qr_ready .status-dot {
+  background: #3b82f6;
+}
+
+.status-indicator.connected .status-dot {
+  background: #10b981;
+}
+
+.status-indicator .status-text {
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.whatsapp-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.whatsapp-connect-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  justify-content: center;
+}
+
+/* WhatsApp Numbers Display */
+.whatsapp-numbers {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: rgba(37, 211, 102, 0.05);
+  border: 1px solid rgba(37, 211, 102, 0.2);
+  border-radius: 8px;
+}
+
+.number-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.number-row:last-of-type {
+  margin-bottom: 0.75rem;
+  border-bottom: none;
+}
+
+.number-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.number-icon {
+  font-size: 1.25rem;
+}
+
+.number-label div {
+  display: flex;
+  flex-direction: column;
+}
+
+.number-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.number-desc {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.number-value {
+  font-size: 0.875rem;
+  color: #25d366;
+  font-weight: 500;
+}
+
+.number-value:empty::before,
+.number-value:not(:empty)[content='Not set']::before {
+  content: 'Not set';
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+.config-numbers-btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+/* Number Config Modal */
+.number-config-modal {
+  max-width: 420px;
+}
+
+.number-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.label-icon {
+  font-size: 1.25rem;
+  margin-right: 0.25rem;
+}
+
+.label-hint {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.form-group input {
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #111827;
+  background: #fff;
+  transition: all 0.2s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.input-hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.number-config-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+/* QR Code Modal */
+.qr-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.qr-modal {
+  background: #fff;
+  border-radius: 16px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.qr-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.qr-modal-header h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.qr-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.qr-modal-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.qr-modal-content {
+  padding: 1.5rem;
+}
+
+.qr-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ═══════════════════════════════════════
+   CUSTOMER CONVERSATIONS STYLES
+   ═══════════════════════════════════════ */
+
+.conversations-section {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.conversations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.conversation-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.conversation-card:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(59, 130, 246, 0.3);
+  transform: translateY(-2px);
+}
+
+.conversation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.conversation-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.conversation-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.conversation-preview {
+  margin-bottom: 1rem;
+}
+
+.conversation-preview .product-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.product-price {
+  color: #10b981;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.last-message {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.extracted-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.info-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  background-color: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.conversation-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.conversation-footer span {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+}
+
+/* Conversation Modal */
+.conversation-modal {
+  max-width: 700px;
+  max-height: 90vh;
+}
+
+.conversation-detail-content {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.conversation-product-info {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.conversation-product-info h4 {
+  color: #ffffff;
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.conversation-product-info p {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+  margin: 0.25rem 0;
+}
+
+.conversation-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.message-detail {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  max-width: 85%;
+}
+
+.message-detail.customer {
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  align-self: flex-start;
+}
+
+.message-detail.bot {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.message-sender {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.message-detail.customer .message-sender {
+  color: #3b82f6;
+}
+
+.message-detail.bot .message-sender {
+  color: #ffffff;
+}
+
+.message-time {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.message-content {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.extracted-info-detail {
+  background-color: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.extracted-info-detail h4 {
+  color: #10b981;
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.extracted-info-detail pre {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* No Conversations State */
+.no-conversations {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+}
+
+.no-conversations h3 {
+  color: #ffffff;
+  font-size: 1.25rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.no-conversations p {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  max-width: 400px;
+  text-align: center;
+  margin: 0;
+}
+
+/* Typing Indicator for Loading */
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.typing-indicator span {
+  width: 8px;
+  height: 8px;
+  background: #3b82f6;
+  border-radius: 50%;
+  animation: typing 1.4s infinite ease-in-out both;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes typing {
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+.qr-loading p {
+  color: #374151;
+  font-weight: 500;
+  margin: 0;
+}
+
+.qr-hint {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-top: 0.5rem !important;
+}
+
+.qr-code-container {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.qr-code-container img {
+  max-width: 256px;
+  width: 100%;
+  height: auto;
+}
+
+.qr-instructions {
+  text-align: center;
+}
+
+.qr-instructions p {
+  color: #374151;
+  margin: 0 0 0.75rem 0;
+}
+
+.qr-instructions ol {
+  text-align: left;
+  color: #6b7280;
+  font-size: 0.875rem;
+  padding-left: 1.25rem;
+  margin: 0 0 1rem 0;
+}
+
+.qr-instructions li {
+  margin-bottom: 0.5rem;
+}
+
+.qr-note {
+  font-size: 0.875rem;
+  color: #6b7280;
+  background: #eff6ff;
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin: 0;
+}
+
+/* QR Success State */
+.qr-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.qr-success .success-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  animation: scaleIn 0.5s ease;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+
+.qr-success h4 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #166534;
+  margin: 0 0 12px 0;
+}
+
+.qr-success .success-phone {
+  font-size: 18px;
+  font-weight: 500;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 8px 16px;
+  border-radius: 8px;
+  margin: 0 0 16px 0;
+  font-family: monospace;
+}
+
+.qr-success .success-message {
+  font-size: 14px;
+  color: #166534;
+  margin: 0;
+  max-width: 280px;
 }
 
 .demand-item:last-child .demand-bar-fill {

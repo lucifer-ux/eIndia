@@ -338,6 +338,21 @@
   margin-left: 0;
 }
 
+/* Notification message styling */
+.message-bubble.notification {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  font-style: italic;
+  border-left: 3px solid #047857;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.message-group.seller .message-bubble.notification {
+  margin-left: 0;
+  margin-right: auto;
+  border-radius: 16px 16px 16px 4px;
+}
+
 /* Typing Indicator */
 .typing-indicator {
   display: flex;

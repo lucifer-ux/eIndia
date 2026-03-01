@@ -9,6 +9,7 @@ const multer = require('multer');
 require('dotenv').config();
 const authRoutes = require('./authRoutes');
 const { searchAssuredInventory, getProductBySku, getAssuredSeller } = require('./sellerInventory');
+const { createChat, getUserChats, getChat, updateChat, deleteChat, deleteAllUserChats } = require('./dynamodb');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -820,21 +821,48 @@ Assistant:`;
 // ═══════════════════════════════════════
 
 app.post('/api/search', async (req, res) => {
-  const { query, language, sessionId = 'default' } = req.body;
+  const { query, language, sessionId = 'default', previousMessages = [] } = req.body;
 
   if (!query || !query.trim()) {
     return res.status(400).json({ error: 'Query is required' });
   }
 
   try {
-    console.log('Query:', query, 'Session:', sessionId);
+    console.log('Query:', query, 'Session:', sessionId, 'Previous messages:', previousMessages.length);
 
     // Get or create session state
-    let state = conversationState.get(sessionId) || {
-      phase: 'new',
-      extracted: {},
-      messages: []
-    };
+    let state = conversationState.get(sessionId);
+
+    // If no state exists and we have previous messages, restore from them
+    if (!state && previousMessages.length > 0) {
+      state = {
+        phase: 'restored',
+        extracted: {},
+        messages: previousMessages.map(m => ({
+          role: m.role || (m.type === 'user' ? 'user' : 'assistant'),
+          content: m.content,
+          timestamp: Date.now()
+        }))
+      };
+      // Try to extract product info from previous messages
+      for (const msg of previousMessages) {
+        if (msg.role === 'user' || msg.type === 'user') {
+          const extracted = await analyzeQueryWithLLM(msg.content, state.extracted);
+          const regexExtracted = analyzeQuery(msg.content, state.extracted);
+          state.extracted = { ...state.extracted, ...regexExtracted, ...extracted };
+        }
+      }
+      console.log('Restored state from previous messages:', state.extracted);
+    }
+
+    // Fallback to new state if still no state
+    if (!state) {
+      state = {
+        phase: 'new',
+        extracted: {},
+        messages: []
+      };
+    }
 
     // Add user message to history
     state.messages.push({ role: 'user', content: query, timestamp: Date.now() });
@@ -1270,6 +1298,226 @@ app.post('/api/tts', async (req, res) => {
     res.send(audioBuffer);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════
+// USER CHAT HISTORY API
+// ═══════════════════════════════════════
+
+/**
+ * Generate chat title using LLM
+ */
+async function generateChatTitle(messages) {
+  try {
+    // Get first user message or first few messages for context
+    const userMessages = messages.filter(m => m.type === 'user' || m.role === 'user');
+    if (userMessages.length === 0) return 'New Chat';
+
+    const firstMessage = userMessages[0].content || userMessages[0].message || '';
+    if (!firstMessage) return 'New Chat';
+
+    const prompt = `Generate a short, descriptive title (3-5 words max) for a chat that starts with this user message: "${firstMessage.substring(0, 200)}"
+
+Requirements:
+- Maximum 5 words
+- Capture the main intent of the query
+- Be concise and clear
+- Return ONLY the title, nothing else
+
+Examples:
+- User: "I want to buy a laptop under $1000" -> "Laptop Purchase Inquiry"
+- User: "Tell me about Arduino boards" -> "Arduino Board Research"
+- User: "Compare iPhone 15 and Samsung S24" -> "iPhone vs Samsung Comparison"
+
+Title:`;
+
+    const stream = await openai.responses.create({
+      model: MODEL,
+      input: [{ role: 'user', content: prompt }],
+      stream: true,
+    });
+
+    let response = '';
+    for await (const event of stream) {
+      if (event.type === 'response.output_text.delta') {
+        response += event.delta;
+      }
+    }
+
+    const title = response.trim().replace(/["']/g, '');
+    return title || 'New Chat';
+  } catch (error) {
+    console.error('Error generating chat title:', error);
+    // Fallback: use first 30 chars of first user message
+    const firstMessage = messages.find(m => m.type === 'user' || m.role === 'user');
+    if (firstMessage) {
+      const content = firstMessage.content || firstMessage.message || '';
+      return content.substring(0, 30) + (content.length > 30 ? '...' : '');
+    }
+    return 'New Chat';
+  }
+}
+
+/**
+ * POST /api/chat/create
+ * Create a new chat for a user
+ */
+app.post('/api/chat/create', async (req, res) => {
+  const { userId, chatId, title, messages = [] } = req.body;
+
+  if (!userId || !chatId) {
+    return res.status(400).json({ error: 'userId and chatId are required' });
+  }
+
+  try {
+    // Generate title if not provided
+    let chatTitle = title;
+    if (!chatTitle && messages.length > 0) {
+      chatTitle = await generateChatTitle(messages);
+    }
+
+    const chat = await createChat({
+      userId,
+      chatId,
+      title: chatTitle || 'New Chat',
+      messages,
+    });
+
+    res.json({ success: true, chat });
+  } catch (error) {
+    console.error('Create chat error:', error);
+    res.status(500).json({ error: 'Failed to create chat' });
+  }
+});
+
+/**
+ * GET /api/chat/list/:userId
+ * Get all chats for a user
+ */
+app.get('/api/chat/list/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const chats = await getUserChats(userId);
+    res.json({ success: true, chats });
+  } catch (error) {
+    console.error('Get user chats error:', error);
+    res.status(500).json({ error: 'Failed to fetch chats' });
+  }
+});
+
+/**
+ * GET /api/chat/:userId/:chatId
+ * Get a specific chat
+ */
+app.get('/api/chat/:userId/:chatId', async (req, res) => {
+  const { userId, chatId } = req.params;
+
+  try {
+    const chat = await getChat(userId, chatId);
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+    res.json({ success: true, chat });
+  } catch (error) {
+    console.error('Get chat error:', error);
+    res.status(500).json({ error: 'Failed to fetch chat' });
+  }
+});
+
+/**
+ * POST /api/chat/update
+ * Update chat messages and/or title
+ */
+app.post('/api/chat/update', async (req, res) => {
+  const { userId, chatId, messages, title } = req.body;
+
+  if (!userId || !chatId) {
+    return res.status(400).json({ error: 'userId and chatId are required' });
+  }
+
+  try {
+    // Generate title from first message if not provided and this is the first update
+    let chatTitle = title;
+    if (!chatTitle && messages && messages.length > 0) {
+      const existingChat = await getChat(userId, chatId);
+      if (!existingChat || existingChat.title === 'New Chat') {
+        chatTitle = await generateChatTitle(messages);
+      }
+    }
+
+    const chat = await updateChat({
+      userId,
+      chatId,
+      messages,
+      title: chatTitle,
+    });
+
+    res.json({ success: true, chat });
+  } catch (error) {
+    console.error('Update chat error:', error);
+    res.status(500).json({ error: 'Failed to update chat' });
+  }
+});
+
+/**
+ * POST /api/chat/delete
+ * Delete a specific chat
+ */
+app.post('/api/chat/delete', async (req, res) => {
+  const { userId, chatId } = req.body;
+
+  if (!userId || !chatId) {
+    return res.status(400).json({ error: 'userId and chatId are required' });
+  }
+
+  try {
+    const result = await deleteChat(userId, chatId);
+    res.json(result);
+  } catch (error) {
+    console.error('Delete chat error:', error);
+    res.status(500).json({ error: 'Failed to delete chat' });
+  }
+});
+
+/**
+ * POST /api/chat/delete-all
+ * Delete all chats for a user
+ */
+app.post('/api/chat/delete-all', async (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  try {
+    const result = await deleteAllUserChats(userId);
+    res.json(result);
+  } catch (error) {
+    console.error('Delete all chats error:', error);
+    res.status(500).json({ error: 'Failed to delete all chats' });
+  }
+});
+
+/**
+ * POST /api/chat/generate-title
+ * Generate a title for a chat based on messages
+ */
+app.post('/api/chat/generate-title', async (req, res) => {
+  const { messages } = req.body;
+
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: 'messages array is required' });
+  }
+
+  try {
+    const title = await generateChatTitle(messages);
+    res.json({ success: true, title });
+  } catch (error) {
+    console.error('Generate title error:', error);
+    res.status(500).json({ error: 'Failed to generate title' });
   }
 });
 

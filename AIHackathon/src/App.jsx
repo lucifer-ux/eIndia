@@ -113,9 +113,10 @@ function App() {
         />
       )}
       {currentScreen === 'dashboard' && (
-        <Dashboard 
-          onLogout={handleLogout} 
+        <Dashboard
+          onLogout={handleLogout}
           onStartSellerChat={handleStartSellerChat}
+          user={authData}
         />
       )}
       {currentScreen === 'org-dashboard' && (

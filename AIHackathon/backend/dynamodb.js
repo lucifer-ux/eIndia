@@ -39,8 +39,12 @@ async function upsertUser({ userId, email, displayName, firebaseToken, loginProv
 
 /**
  * Upsert a seller record in seller-table after successful Firebase auth
+ * Preserves existing ordersPlaced if seller already exists
  */
 async function upsertSeller({ sellerId, email, displayName, firebaseToken, loginProvider }) {
+    // First check if seller exists to preserve ordersPlaced
+    const existingSeller = await getSeller(sellerId);
+    
     const params = {
         TableName: SELLER_TABLE,
         Item: {
@@ -50,6 +54,8 @@ async function upsertSeller({ sellerId, email, displayName, firebaseToken, login
             firebaseToken,
             loginProvider,
             isLoggedIn: true,
+            ordersPlaced: existingSeller?.ordersPlaced || 0,
+            orderVolume: existingSeller?.orderVolume || 0,
             lastLoginAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         },
@@ -57,6 +63,27 @@ async function upsertSeller({ sellerId, email, displayName, firebaseToken, login
 
     await docClient.send(new PutCommand(params));
     return params.Item;
+}
+
+/**
+ * Increment seller's order count and volume
+ */
+async function incrementSellerOrder(sellerId, orderAmount) {
+    const params = {
+        TableName: SELLER_TABLE,
+        Key: { sellerId },
+        UpdateExpression: 'SET ordersPlaced = if_not_exists(ordersPlaced, :zero) + :inc, orderVolume = if_not_exists(orderVolume, :zero) + :amount, updatedAt = :now',
+        ExpressionAttributeValues: {
+            ':inc': 1,
+            ':amount': orderAmount || 0,
+            ':zero': 0,
+            ':now': new Date().toISOString(),
+        },
+        ReturnValues: 'ALL_NEW',
+    };
+    
+    const result = await docClient.send(new UpdateCommand(params));
+    return result.Attributes;
 }
 
 /**
@@ -122,4 +149,5 @@ module.exports = {
     getSeller,
     setUserLoggedOut,
     setSellerLoggedOut,
+    incrementSellerOrder,
 };

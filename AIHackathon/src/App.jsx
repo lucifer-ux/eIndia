@@ -7,11 +7,13 @@ import LoginScreen from './screens/LoginScreen'
 import OrgLoginScreen from './screens/OrgLoginScreen'
 import Dashboard from './screens/Dashboard'
 import OrgDashboard from './screens/OrgDashboard'
+import SellerChat from './screens/SellerChat'
 import './App.css'
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState('loading')
   const [authData, setAuthData] = useState(null)
+  const [sellerChatData, setSellerChatData] = useState(null)
 
   // Persist auth state across page refreshes
   useEffect(() => {
@@ -75,6 +77,16 @@ function App() {
     setCurrentScreen('landing')
   }
 
+  const handleStartSellerChat = (productData) => {
+    setSellerChatData(productData)
+    setCurrentScreen('seller-chat')
+  }
+
+  const handleCloseSellerChat = () => {
+    setSellerChatData(null)
+    setCurrentScreen('dashboard')
+  }
+
   return (
     <>
       {currentScreen === 'loading' && (
@@ -101,10 +113,24 @@ function App() {
         />
       )}
       {currentScreen === 'dashboard' && (
-        <Dashboard onLogout={handleLogout} />
+        <Dashboard 
+          onLogout={handleLogout} 
+          onStartSellerChat={handleStartSellerChat}
+        />
       )}
       {currentScreen === 'org-dashboard' && (
-        <OrgDashboard onLogout={handleLogout} />
+        <OrgDashboard 
+          onLogout={handleLogout} 
+          sellerId={authData?.sellerId}
+          sellerData={authData}
+        />
+      )}
+      {currentScreen === 'seller-chat' && sellerChatData && (
+        <SellerChat 
+          productData={sellerChatData}
+          userData={authData}
+          onClose={handleCloseSellerChat}
+        />
       )}
     </>
   )

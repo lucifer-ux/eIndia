@@ -116,3 +116,41 @@ export async function logout(userId, sellerId) {
         console.error('Backend logout notification failed:', error);
     }
 }
+
+// ==================== DEMO SELLER AUTH ====================
+
+/**
+ * Demo seller login - bypasses Firebase for testing
+ * Credentials: demo@electrofind.com / demo123
+ */
+export async function loginWithDemoSeller() {
+    const response = await fetch(`${API_URL}/api/auth/demo-seller-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            email: 'demo@electrofind.com', 
+            password: 'demo123' 
+        }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Demo login failed');
+    }
+
+    return response.json();
+}
+
+/**
+ * Get demo seller data (mock stats, inquiries, orders)
+ */
+export async function getDemoSellerData() {
+    const response = await fetch(`${API_URL}/api/auth/demo-seller-data`);
+    
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch demo data');
+    }
+
+    return response.json();
+}

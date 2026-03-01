@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import InputField from '../components/InputField';
 import SocialLoginButton from '../components/SocialLoginButton';
 import Navbar from '../components/Navbar';
-import { sellerLoginWithEmail, sellerSignupWithEmail, sellerLoginWithGoogle, resetPassword } from '../services/authService';
+import { sellerLoginWithEmail, sellerSignupWithEmail, sellerLoginWithGoogle, resetPassword, loginWithDemoSeller } from '../services/authService';
 import './LoginScreen.css';
 
 const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
@@ -77,6 +77,19 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
       setError('');
     } catch (err) {
       setError(err.message || t('error.resetFailed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const result = await loginWithDemoSeller();
+      onLoginSuccess(result.seller || result);
+    } catch (err) {
+      setError(err.message || 'Demo login failed');
     } finally {
       setLoading(false);
     }
@@ -188,6 +201,30 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
               onClick={handleGoogleLogin}
             />
           </div>
+
+          {!isSignup && (
+            <div className="demo-login-section" style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid rgba(148, 163, 184, 0.1)' }}>
+              <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px', textAlign: 'center' }}>
+                🎯 Quick Demo Access
+              </p>
+              <button 
+                type="button"
+                className="login-submit-btn"
+                onClick={handleDemoLogin}
+                disabled={loading}
+                style={{ 
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  fontSize: '14px',
+                  padding: '12px'
+                }}
+              >
+                {loading ? 'Logging in...' : 'Login with Demo Account'}
+              </button>
+              <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px', textAlign: 'center' }}>
+                demo@electrofind.com / demo123
+              </p>
+            </div>
+          )}
         </div>
 
         <p className="login-footer">

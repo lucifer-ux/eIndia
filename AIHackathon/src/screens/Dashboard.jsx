@@ -5,7 +5,7 @@ import './Dashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
-const Dashboard = ({ onLogout }) => {
+const Dashboard = ({ onLogout, onStartSellerChat }) => {
   const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState([
     {
@@ -19,6 +19,8 @@ const Dashboard = ({ onLogout }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [playingId, setPlayingId] = useState(null);
+  const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  const [awaitingClarification, setAwaitingClarification] = useState(false);
   const messagesEndRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -55,20 +57,55 @@ const Dashboard = ({ onLogout }) => {
       const response = await fetch(`${API_URL}/api/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: userMessage.content, language: i18n.language }),
+        body: JSON.stringify({ 
+          query: userMessage.content, 
+          language: i18n.language,
+          sessionId: sessionId
+        }),
       });
 
       const data = await response.json();
 
       if (data.type === 'buy') {
-        const buyMessage = {
-          id: Date.now() + 1,
-          type: 'ai',
-          content: data.introMessage || `I found some great options for **${data.expandedData.product_category}**. Here are the best deals sorted by price:`,
-          buyData: data
-        };
-        setMessages(prev => [...prev, buyMessage]);
+          if (data.phase === 'clarification') {
+            // Phase 1: Show clarification questions
+            setAwaitingClarification(true);
+            const clarificationMessage = {
+              id: Date.now() + 1,
+              type: 'ai',
+              content: data.message,
+              progress: data.progress
+            };
+            setMessages(prev => [...prev, clarificationMessage]);
+        } else if (data.phase === 'results') {
+          // Phase 2: Show search results
+          setAwaitingClarification(false);
+          
+          let introContent;
+          if (data.fallbackTriggered) {
+            introContent = "I found some options, though results were limited. Here are the best deals I could find:";
+          } else if (data.searchData?.user_preferences) {
+            const prefs = data.searchData.user_preferences;
+            introContent = `Great! Based on your preferences${prefs.budget !== 'not specified' ? ` (budget: ${prefs.budget})` : ''}${prefs.region ? ` in ${prefs.region}` : ''}, here are the best deals I found:`;
+          } else {
+            introContent = "Based on your preferences, here are the best deals I found:";
+          }
+          
+          const buyMessage = {
+            id: Date.now() + 1,
+            type: 'ai',
+            content: introContent,
+            buyData: {
+              results: data.results,
+              searchStatus: data.searchStatus,
+              totalFound: data.totalFound,
+              searchData: data.searchData
+            }
+          };
+          setMessages(prev => [...prev, buyMessage]);
+        }
       } else if (data.type === 'research') {
+        setAwaitingClarification(false);
         const researchMessage = {
           id: Date.now() + 1,
           type: 'ai',
@@ -77,6 +114,7 @@ const Dashboard = ({ onLogout }) => {
         };
         setMessages(prev => [...prev, researchMessage]);
       } else {
+        setAwaitingClarification(false);
         const aiMessage = {
           id: Date.now() + 1,
           type: 'ai',
@@ -226,34 +264,114 @@ const Dashboard = ({ onLogout }) => {
                   </button>
                 )}
 
-                {/* Buy Results */}
+                {/* Buy Results - New Product Card UI */}
+                {/* Clarification Progress */}
+                {message.progress && (
+                  <div className="clarification-progress">
+                    <div className={`progress-item ${message.progress.hasProduct ? 'complete' : 'pending'}`}>
+                      <span className="progress-icon">{message.progress.hasProduct ? '✓' : '○'}</span>
+                      Product
+                    </div>
+                    <div className={`progress-item ${message.progress.hasBudget ? 'complete' : 'pending'}`}>
+                      <span className="progress-icon">{message.progress.hasBudget ? '✓' : '○'}</span>
+                      Budget
+                    </div>
+                    <div className={`progress-item ${message.progress.hasRegion ? 'complete' : 'pending'}`}>
+                      <span className="progress-icon">{message.progress.hasRegion ? '✓' : '○'}</span>
+                      Region
+                    </div>
+                  </div>
+                )}
+
                 {message.buyData && message.buyData.results && (
-                  <div className="buy-results">
-                    <div className="buy-results-header">
-                      <span className="buy-category">{message.buyData.expandedData.product_category}</span>
-                      <span className="buy-hint">Price: {message.buyData.expandedData.price_range_hint}</span>
-                    </div>
-                    <div className="buy-results-list">
-                      {message.buyData.results.map((result) => (
-                        <a key={result.rank} href={result.buy_link} target="_blank" rel="noopener noreferrer" className="buy-result-card">
-                          <div className="buy-result-rank">#{result.rank}</div>
-                          <div className="buy-result-info">
-                            <div className="buy-result-title">{result.product_title}</div>
-                            <div className="buy-result-store">{result.store}</div>
-                            <div className="buy-result-desc">{result.description}</div>
-                          </div>
-                          <div className="buy-result-price">{result.price}</div>
-                        </a>
-                      ))}
-                    </div>
-                    {message.buyData.expandedData.key_specs.length > 0 && (
-                      <div className="buy-specs">
-                        <span className="buy-specs-label">{t('dashboard.keySpecs')}</span>
-                        {message.buyData.expandedData.key_specs.map((spec, idx) => (
-                          <span key={idx} className="buy-spec-tag">{spec}</span>
-                        ))}
+                  <div className="product-results">
+                    {message.buyData.results.map((result) => (
+                      <div 
+                        key={result.rank} 
+                        className={`product-card ${result.isAssured ? 'product-card-assured' : ''}`}
+                      >
+                        {/* Assured Partner Badge */}
+                        {result.isAssured && (
+                          <div className="assured-partner-badge">ASSURED PARTNER</div>
+                        )}
+                        
+                        {/* Product Header */}
+                        <div className="product-header">
+                          <h3 className="product-title">{result.product_title}</h3>
+                          <div className="product-price">{result.price}</div>
+                        </div>
+                        
+                        {/* Store & Stock Info */}
+                        <div className="product-meta">
+                          <span className="product-store">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                            {result.store}
+                          </span>
+                          <span className={`product-stock ${
+                            result.availability === 'Out of Stock' ? 'out-of-stock' : 
+                            result.availability === 'Limited Stock' ? 'low-stock' : 'in-stock'
+                          }`}>
+                            {result.availability || 'In Stock'}
+                          </span>
+                          {result.deal_flag && <span className="deal-badge">DEAL</span>}
+                        </div>
+                        
+                        {/* Product Description */}
+                        <p className="product-description">{result.description}</p>
+                        
+                        {/* Action Buttons */}
+                        <div className="product-actions">
+                          {result.isAssured ? (
+                            <>
+                              <button 
+                                className="btn-chat-to-buy"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onStartSellerChat && onStartSellerChat(result);
+                                }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                                Chat to Buy
+                              </button>
+                              <a 
+                                href={result.buy_link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="btn-view-details"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                View Details →
+                              </a>
+                            </>
+                          ) : (
+                            <a 
+                              href={result.buy_link} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="btn-buy-now"
+                            >
+                              Buy Now →
+                            </a>
+                          )}
+                        </div>
+                        
+                        {/* Make the whole card clickable for non-assured products */}
+                        {!result.isAssured && (
+                          <a 
+                            href={result.buy_link} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="product-card-overlay"
+                          >
+                            <span className="sr-only">Buy {result.product_title}</span>
+                          </a>
+                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
                 )}
 

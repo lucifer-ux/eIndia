@@ -7,6 +7,8 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 
 const Dashboard = ({ onLogout, onStartSellerChat, user }) => {
   const { t, i18n } = useTranslation();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef(null);
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -43,6 +45,27 @@ const Dashboard = ({ onLogout, onStartSellerChat, user }) => {
   }, [currentChatId]);
 
   const userId = user?.uid || user?.userId || localStorage.getItem('userId');
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Get user display info
+  const getUserInitials = () => {
+    const displayName = user?.displayName || '';
+    const email = user?.email || '';
+    if (displayName) {
+      return displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    return email.slice(0, 2).toUpperCase();
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -383,25 +406,23 @@ const Dashboard = ({ onLogout, onStartSellerChat, user }) => {
           type: 'ai',
           content: data.response
         };
-        setMessages(prev => [...prev, aiMessage]);
-        // Save chat after AI response
-        setTimeout(() => {
-          const currentMessages = [...messagesRef.current, aiMessage];
-          saveChatWithMessages(currentMessages);
-        }, 100);
+        setMessages(prev => {
+          const newMessages = [...prev, aiMessage];
+          setTimeout(() => saveChatWithMessages(newMessages), 50);
+          return newMessages;
+        });
       }
     } catch (error) {
       const errorMessage = {
-        id: Date.now() + 1,
+        id: `ai-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         type: 'ai',
         content: t('dashboard.error')
       };
-      setMessages(prev => [...prev, errorMessage]);
-      // Save chat even on error
-      setTimeout(() => {
-        const currentMessages = [...messagesRef.current, errorMessage];
-        saveChatWithMessages(currentMessages);
-      }, 100);
+      setMessages(prev => {
+        const newMessages = [...prev, errorMessage];
+        setTimeout(() => saveChatWithMessages(newMessages), 50);
+        return newMessages;
+      });
     } finally {
       setIsLoading(false);
     }
@@ -594,9 +615,41 @@ const Dashboard = ({ onLogout, onStartSellerChat, user }) => {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <LanguageSelector />
-              <button className="btn btn-secondary" onClick={onLogout}>
-                {t('nav.logout')}
-              </button>
+              <div className="user-menu-container" ref={userMenuRef}>
+                <button
+                  className="user-icon-btn"
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  title="User menu"
+                >
+                  <div className="user-avatar-circle">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                </button>
+                {showUserMenu && (
+                  <div className="user-dropdown-menu">
+                    <div className="user-dropdown-header">
+                      <div className="user-avatar-large">{getUserInitials()}</div>
+                      <div className="user-info">
+                        {user?.displayName && (
+                          <span className="user-display-name">{user.displayName}</span>
+                        )}
+                        <span className="user-email">{user?.email}</span>
+                      </div>
+                    </div>
+                    <div className="user-dropdown-divider"></div>
+                    <button className="user-dropdown-logout" onClick={onLogout}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                      </svg>
+                      {t('nav.logout')}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </nav>
 

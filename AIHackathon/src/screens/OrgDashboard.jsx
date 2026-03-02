@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './OrgDashboard.css';
 import SellerConversationView from './SellerConversationView';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = 'http://localhost:3001/api';
 
 const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
@@ -1034,7 +1034,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
           </div>
-          <span className="navbar-logo-text">eIndia</span>
+          <span className="navbar-logo-text"></span>
         </div>
         
         {/* Desktop Navigation */}

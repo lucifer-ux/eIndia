@@ -1,8 +1,125 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const QRCode = require('qrcode');
+const fs = require('fs');
+const path = require('path');
 
 // Store active WhatsApp clients per seller
 const whatsappClients = new Map();
+
+/**
+ * Clean up Chrome lock files that prevent browser restart
+ * @param {string} sellerId 
+ */
+function cleanupLockFiles(sellerId) {
+  const sessionPath = path.resolve(`./whatsapp-session-${sellerId}`);
+  const lockFiles = [
+    path.join(sessionPath, 'session', 'SingletonLock'),
+    path.join(sessionPath, 'session', 'SingletonSocket'),
+    path.join(sessionPath, 'session', 'SingletonCookie'),
+    path.join(sessionPath, 'session', 'Default', 'SingletonLock'),
+    path.join(sessionPath, 'session', 'Default', 'SingletonSocket'),
+    path.join(sessionPath, 'session', 'Default', 'SingletonCookie')
+  ];
+  
+  for (const lockFile of lockFiles) {
+    try {
+      if (fs.existsSync(lockFile)) {
+        fs.unlinkSync(lockFile);
+        console.log(`[WhatsApp] Cleaned up lock file: ${lockFile}`);
+      }
+    } catch (err) {
+      console.log(`[WhatsApp] Could not clean up lock file ${lockFile}: ${err.message}`);
+    }
+  }
+}
+
+/**
+ * Check if a client is actually usable by verifying browser connection
+ * @param {Object} clientInfo 
+ * @returns {boolean}
+ */
+async function isClientUsable(clientInfo) {
+  if (!clientInfo || !clientInfo.client) {
+    return false;
+  }
+  
+  try {
+    // Try to access the puppeteer browser to check if it's connected
+    const browser = clientInfo.client.pupBrowser;
+    if (!browser) {
+      return false;
+    }
+    
+    // Check if browser is connected
+    if (browser.isConnected && !browser.isConnected()) {
+      return false;
+    }
+    
+    // Try to get state to verify client is responsive
+    await clientInfo.client.getState();
+    return true;
+  } catch (err) {
+    console.log(`[WhatsApp] Client usability check failed: ${err.message}`);
+    return false;
+  }
+}
+
+/**
+ * Force cleanup client and browser processes
+ * @param {string} sellerId 
+ */
+async function forceCleanupClient(sellerId) {
+  const clientInfo = whatsappClients.get(sellerId);
+  
+  console.log(`[WhatsApp] Force cleaning up client for ${sellerId}`);
+  
+  if (clientInfo && clientInfo.client) {
+    try {
+      // Try to close the browser properly
+      const browser = clientInfo.client.pupBrowser;
+      if (browser) {
+        try {
+          await browser.close();
+          console.log(`[WhatsApp] Browser closed for ${sellerId}`);
+        } catch (err) {
+          console.log(`[WhatsApp] Browser close error (ignoring): ${err.message}`);
+        }
+      }
+    } catch (err) {
+      console.log(`[WhatsApp] Error accessing browser: ${err.message}`);
+    }
+    
+    try {
+      await clientInfo.client.destroy();
+      console.log(`[WhatsApp] Client destroyed for ${sellerId}`);
+    } catch (err) {
+      console.log(`[WhatsApp] Client destroy error (ignoring): ${err.message}`);
+    }
+  }
+  
+  // Clean up lock files
+  cleanupLockFiles(sellerId);
+  
+  // Remove from map
+  whatsappClients.delete(sellerId);
+  console.log(`[WhatsApp] Client removed from map for ${sellerId}`);
+}
+
+/**
+ * Clear session data directory completely
+ * @param {string} sellerId 
+ */
+function clearSessionData(sellerId) {
+  const sessionPath = path.resolve(`./whatsapp-session-${sellerId}`);
+  try {
+    if (fs.existsSync(sessionPath)) {
+      fs.rmSync(sessionPath, { recursive: true, force: true });
+      console.log(`[WhatsApp] Session data cleared for ${sellerId}`);
+    }
+  } catch (err) {
+    console.log(`[WhatsApp] Could not clear session data: ${err.message}`);
+  }
+}
 
 /**
  * Initialize WhatsApp client for a seller
@@ -10,22 +127,32 @@ const whatsappClients = new Map();
  * @returns {Promise<{qrCode: string, status: string}>} - QR code data URL and status
  */
 async function initializeClient(sellerId) {
-  // If client already exists and is ready, return current status
+  // If client already exists, check if it's actually usable
   if (whatsappClients.has(sellerId)) {
     const existing = whatsappClients.get(sellerId);
-    if (existing.ready) {
+    
+    // Check if client is truly usable
+    const usable = await isClientUsable(existing);
+    
+    if (!usable) {
+      console.log(`[WhatsApp] Client ${sellerId} exists but is not usable, force cleaning up...`);
+      await forceCleanupClient(sellerId);
+      // Continue to create new client below
+    } else if (existing.ready) {
       console.log(`[WhatsApp] Client ${sellerId} already ready, returning existing status`);
       return { qrCode: null, status: 'ready', message: 'Already connected', phoneNumber: existing.phoneNumber };
-    }
-    // If QR was already generated, return it
-    if (existing.qrCode) {
+    } else if (existing.qrCode) {
       console.log(`[WhatsApp] Client ${sellerId} has QR, returning existing QR`);
       return { qrCode: existing.qrCode, status: 'qr_ready', message: 'Scan QR code with WhatsApp' };
+    } else {
+      // If still connecting, return pending
+      console.log(`[WhatsApp] Client ${sellerId} initializing, returning pending`);
+      return { qrCode: null, status: 'initializing', message: 'Connection in progress' };
     }
-    // If still connecting, return pending
-    console.log(`[WhatsApp] Client ${sellerId} initializing, returning pending`);
-    return { qrCode: null, status: 'initializing', message: 'Connection in progress' };
   }
+
+  // Clean up any lock files before creating new client
+  cleanupLockFiles(sellerId);
 
   return new Promise((resolve, reject) => {
     let qrResolved = false;
@@ -156,11 +283,22 @@ async function initializeClient(sellerId) {
       } catch (err) {
         console.error('[WhatsApp] Client initialization error:', err);
         isDestroyed = true;
-        cleanupClient(sellerId);
-        if (!qrResolved) {
-          if (err.message?.includes('Execution context') || err.message?.includes('Protocol error')) {
-            reject(new Error('WhatsApp session corrupted. Please clear session data and try again.'));
-          } else {
+        
+        // Force full cleanup including session data on critical errors
+        if (err.message?.includes('detached Frame') || 
+            err.message?.includes('Execution context') || 
+            err.message?.includes('Protocol error') ||
+            err.message?.includes('Target closed')) {
+          console.log(`[WhatsApp] Critical initialization error, clearing session data for ${sellerId}...`);
+          await forceCleanupClient(sellerId);
+          // Also clear the session directory completely
+          clearSessionData(sellerId);
+          if (!qrResolved) {
+            reject(new Error('WhatsApp session corrupted. Session cleared. Please try again.'));
+          }
+        } else {
+          cleanupClient(sellerId);
+          if (!qrResolved) {
             reject(err);
           }
         }

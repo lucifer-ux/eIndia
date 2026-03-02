@@ -10,7 +10,7 @@ require('dotenv').config();
 const authRoutes = require('./authRoutes');
 const { searchAssuredInventory, getProductBySku, getAssuredSeller } = require('./sellerInventory');
 const { createChat, getUserChats, getChat, updateChat, deleteChat, deleteAllUserChats, saveSellerUserChat, getSellerConversations, getSellerUserChat, updateSellerUserChat, updateConversationStatus, deleteSellerUserChat, getUserConversations, incrementTotalQueries, incrementResolvedQueries, updateSellerPrompt, getSeller } = require('./dynamodb');
-const whatsappService = require('./whatsappService');
+const whatsappService = require('./twilioService');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -59,6 +59,14 @@ const conversationState = new Map();
 const sellerPrompts = new Map(); // sellerId -> prompt
 const sellerChatSessions = new Map(); // sessionId -> { sellerId, productData, messages }
 const sellerWhatsappConfig = new Map(); // sellerId -> { recipientNumber }
+
+// Initialize demo seller WhatsApp config with environment variable or default
+if (process.env.DEMO_SELLER_WHATSAPP_NUMBER) {
+  sellerWhatsappConfig.set('demo-seller-001', {
+    recipientNumber: process.env.DEMO_SELLER_WHATSAPP_NUMBER
+  });
+  console.log('[WhatsApp] Demo seller WhatsApp config initialized');
+}
 
 // Store buy readiness tracking per session
 const buyReadinessTracking = new Map(); // sessionId -> { lastChecked, isReady, notified }

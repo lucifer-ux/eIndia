@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './SellerConversationView.css';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 const SellerConversationView = ({ conversation, sellerData, onClose, sellerId }) => {
   const [messages, setMessages] = useState([]);

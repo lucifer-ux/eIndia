@@ -28,6 +28,7 @@ const Dashboard = ({ onLogout, onStartSellerChat, user }) => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const messagesEndRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -289,7 +290,15 @@ const Dashboard = ({ onLogout, onStartSellerChat, user }) => {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'Just now';
+    
     const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Just now';
+    }
+    
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
@@ -602,10 +611,126 @@ const Dashboard = ({ onLogout, onStartSellerChat, user }) => {
           </div>
         </aside>
 
+        {/* Mobile Sidebar Overlay */}
+        {mobileSidebarOpen && (
+          <div 
+            className="mobile-sidebar-overlay"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+        )}
+
+        {/* Mobile Sidebar Drawer */}
+        <aside className={`chat-sidebar mobile ${mobileSidebarOpen ? 'open' : ''}`}>
+          <div className="sidebar-header mobile-header">
+            <button className="btn-new-chat" onClick={() => { startNewChat(); setMobileSidebarOpen(false); }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              New Chat
+            </button>
+            <button 
+              className="mobile-sidebar-close"
+              onClick={() => setMobileSidebarOpen(false)}
+              aria-label="Close sidebar"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          {/* Search Box */}
+          <div className="chat-search-container">
+            <div className="chat-search-wrapper">
+              <svg className="chat-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+              </svg>
+              <input
+                type="text"
+                className="chat-search-input"
+                placeholder="Search chats..."
+                value={chatSearchQuery}
+                onChange={(e) => handleChatSearch(e.target.value)}
+              />
+              {chatSearchQuery && (
+                <button
+                  className="chat-search-clear"
+                  onClick={() => handleChatSearch('')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="chat-history">
+            <div className="chat-history-header">
+              <span>Recent Chats {chatHistory.length > 0 && `(${chatHistory.length})`}</span>
+              {chatHistory.length > 0 && (
+                <button className="btn-clear-all" onClick={deleteAllChats} title="Clear all chats">
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            {isLoadingHistory ? (
+              <div className="no-chats">Loading...</div>
+            ) : displayedChats.length === 0 ? (
+              <div className="no-chats">
+                {chatSearchQuery ? 'No chats found' : 'No chats yet'}
+              </div>
+            ) : (
+              displayedChats.map((chat) => (
+                <div
+                  key={chat.chatId}
+                  className={`chat-item ${currentChatId === chat.chatId ? 'active' : ''}`}
+                  onClick={() => { loadChat(chat); setMobileSidebarOpen(false); }}
+                >
+                  <svg className="chat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                  </svg>
+                  <div className="chat-info">
+                    <div className="chat-title">{chat.title || 'New Chat'}</div>
+                    <div className="chat-date">{formatDate(chat.updatedAt)}</div>
+                  </div>
+                  <button
+                    className="chat-delete-btn"
+                    onClick={(e) => deleteChat(e, chat.chatId)}
+                    title="Delete chat"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </aside>
+
         {/* Main Chat Area */}
         <div className="chat-main">
           <nav className="dashboard-navbar">
             <div className="dashboard-brand">
+              {/* Mobile Sidebar Toggle */}
+              <button 
+                className="mobile-sidebar-toggle"
+                onClick={() => setMobileSidebarOpen(true)}
+                aria-label="Open chat history"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <line x1="3" y1="12" x2="21" y2="12"></line>
+                  <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+              </button>
               <div className="dashboard-logo-icon">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />

@@ -9,7 +9,7 @@ const multer = require('multer');
 require('dotenv').config();
 const authRoutes = require('./authRoutes');
 const { searchAssuredInventory, getProductBySku, getAssuredSeller } = require('./sellerInventory');
-const { createChat, getUserChats, getChat, updateChat, deleteChat, deleteAllUserChats, saveSellerUserChat, getSellerConversations, getSellerUserChat, updateSellerUserChat, updateConversationStatus, deleteSellerUserChat, incrementTotalQueries, incrementResolvedQueries, updateSellerPrompt, getSeller } = require('./dynamodb');
+const { createChat, getUserChats, getChat, updateChat, deleteChat, deleteAllUserChats, saveSellerUserChat, getSellerConversations, getSellerUserChat, updateSellerUserChat, updateConversationStatus, deleteSellerUserChat, getUserConversations, incrementTotalQueries, incrementResolvedQueries, updateSellerPrompt, getSeller } = require('./dynamodb');
 const whatsappService = require('./whatsappService');
 
 const app = express();
@@ -2209,6 +2209,26 @@ app.get('/api/seller-user-chat/:chatId', async (req, res) => {
 });
 
 /**
+ * GET /api/seller-user-chat/user-conversations/:userEmail
+ * Get all conversations for a user (to check for existing chats)
+ */
+app.get('/api/seller-user-chat/user-conversations/:userEmail', async (req, res) => {
+  const { userEmail } = req.params;
+
+  if (!userEmail) {
+    return res.status(400).json({ error: 'userEmail is required' });
+  }
+
+  try {
+    const conversations = await getUserConversations(userEmail);
+    res.json({ success: true, conversations });
+  } catch (error) {
+    console.error('[Seller-User-Chat] Get user conversations error:', error);
+    res.status(500).json({ error: 'Failed to fetch user conversations' });
+  }
+});
+
+/**
  * POST /api/seller-user-chat/update
  * Update conversation messages and metadata
  */
@@ -2678,6 +2698,110 @@ app.post('/api/chat/generate-title', async (req, res) => {
   } catch (error) {
     console.error('Generate title error:', error);
     res.status(500).json({ error: 'Failed to generate title' });
+  }
+});
+
+/**
+ * POST /api/seller/chat/suggest-response
+ * Generate AI response suggestion for seller dashboard
+ */
+app.post('/api/seller/chat/suggest-response', async (req, res) => {
+  try {
+    const { 
+      sellerId, 
+      conversationHistory, 
+      latestMessage, 
+      productData, 
+      extractedInfo,
+      customerInfo 
+    } = req.body;
+    
+    console.log('[AI Suggest] Generating response suggestion for seller:', sellerId);
+    
+    if (!process.env.GROQ_API_KEY) {
+      return res.json({
+        suggestion: "Thank you for your interest! We'll get back to you shortly with more information about this product.",
+        confidence: 70,
+        requiresEdit: true
+      });
+    }
+
+    const seller = await getSeller(sellerId);
+    const sellerPrompt = seller?.sellerPrompt || '';
+    
+    const systemPrompt = `You are an AI sales assistant for an e-commerce platform. Generate a helpful, professional response to the customer's latest message.
+
+Context:
+- Product: ${productData?.product_title || 'Unknown'}
+- Price: ${productData?.price || 'N/A'}
+- Customer: ${customerInfo?.name || 'Anonymous'}
+- Location: ${extractedInfo?.location || 'Unknown'}
+
+${sellerPrompt ? `Seller Instructions: ${sellerPrompt}` : ''}
+
+Conversation History:
+${conversationHistory.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n')}
+
+Customer's Latest Message: "${latestMessage}"
+
+${extractedInfo?.wantsHuman ? 'The customer has requested human assistance. Acknowledge this and offer to connect them with a representative.' : ''}
+${extractedInfo?.bargainPrice ? `The customer is negotiating. Original price: ${productData?.price}, Their offer: ${extractedInfo.bargainPrice}` : ''}
+${extractedInfo?.purchaseIntent ? 'The customer shows purchase intent. Encourage them to complete the purchase.' : ''}
+
+Generate a natural, conversational response that:
+1. Addresses the customer's specific question or concern
+2. Is helpful and professional
+3. Encourages further engagement
+4. Uses the product context provided
+
+Response (keep it concise, 2-4 sentences):`;
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: 'Generate a response to the customer.' }
+        ],
+        temperature: 0.7,
+        max_tokens: 300
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.choices && data.choices[0]) {
+      const suggestion = data.choices[0].message.content.trim();
+      
+      // Simple confidence calculation based on response length and content
+      let confidence = 95;
+      if (suggestion.length < 50) confidence = 80;
+      if (suggestion.includes('sorry') || suggestion.includes('apologize')) confidence = 85;
+      
+      console.log('[AI Suggest] Generated suggestion with confidence:', confidence);
+      
+      res.json({
+        success: true,
+        suggestion,
+        confidence,
+        requiresEdit: confidence < 90
+      });
+    } else {
+      throw new Error('No suggestion generated');
+    }
+  } catch (error) {
+    console.error('[AI Suggest] Error:', error);
+    res.json({
+      success: true,
+      suggestion: "Thank you for reaching out! I'd be happy to help you with this product. Let me get you the information you need.",
+      confidence: 75,
+      requiresEdit: true
+    });
   }
 });
 

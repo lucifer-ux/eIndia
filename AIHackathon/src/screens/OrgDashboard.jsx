@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './OrgDashboard.css';
+import SellerConversationView from './SellerConversationView';
 
 const API_BASE_URL = 'http://localhost:3001/api';
 
@@ -34,6 +35,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
   
   // Navigation state
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'products' | 'conversations'
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Conversations state
   const [conversations, setConversations] = useState([]);
@@ -112,7 +114,15 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
 
   // Format relative time
   const formatRelativeTime = (dateString) => {
+    if (!dateString) return 'Just now';
+    
     const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Just now';
+    }
+    
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
@@ -214,7 +224,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
     loadSellerPrompt();
   }, [sellerId]);
 
-  // Check WhatsApp status on mount
+  // Check WhatsApp status on mount and auto-restore connection
   useEffect(() => {
     const checkWhatsappStatus = async () => {
       if (!sellerId) return;
@@ -227,35 +237,114 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
         if (data.phoneNumber) {
           setWhatsappPhone(data.phoneNumber);
         }
+        
+        // If backend has session but client needs reconnect, try to restore
+        if (data.status === 'disconnected') {
+          await attemptAutoReconnect();
+        }
       } catch (err) {
         console.error('Failed to check WhatsApp status:', err);
       }
     };
     
-    // Load saved WhatsApp config
+    // Attempt to auto-restore WhatsApp connection
+    const attemptAutoReconnect = async () => {
+      const savedConfig = localStorage.getItem(`electrofind_whatsapp_${sellerId}`);
+      if (!savedConfig) return;
+      
+      try {
+        const config = JSON.parse(savedConfig);
+        const lastConnected = config.lastConnected ? new Date(config.lastConnected) : null;
+        const hoursSinceConnection = lastConnected ? (Date.now() - lastConnected.getTime()) / (1000 * 60 * 60) : Infinity;
+        
+        // Only auto-restore if connected within last 24 hours
+        if (hoursSinceConnection < 24) {
+          console.log('[WhatsApp] Attempting auto-restore...');
+          
+          const response = await fetch(`${API_BASE_URL}/whatsapp/connect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sellerId })
+          });
+          
+          const data = await response.json();
+          
+          if (data.status === 'ready' || data.status === 'connected') {
+            console.log('[WhatsApp] Auto-restore successful!');
+            setWhatsappStatus('connected');
+            if (data.phoneNumber) {
+              setWhatsappPhone(data.phoneNumber);
+            }
+          }
+        }
+      } catch (err) {
+        console.log('[WhatsApp] Auto-restore failed:', err);
+      }
+    };
+    
+    // Load saved WhatsApp config from localStorage and backend
     const loadWhatsappConfig = async () => {
       if (!sellerId) return;
       
+      // First try localStorage for instant loading
+      const savedConfig = localStorage.getItem(`electrofind_whatsapp_${sellerId}`);
+      if (savedConfig) {
+        try {
+          const config = JSON.parse(savedConfig);
+          if (config.recipientNumber) {
+            setRecipientNumber(config.recipientNumber);
+          }
+          if (config.phoneNumber) {
+            setWhatsappPhone(config.phoneNumber);
+          }
+        } catch (e) {
+          console.error('Failed to parse saved WhatsApp config:', e);
+        }
+      }
+      
+      // Then fetch from backend to ensure sync
       try {
         const response = await fetch(`${API_BASE_URL}/whatsapp/config/${sellerId}`);
         const data = await response.json();
         
-        // Sender number is auto-captured from QR scan
         if (data.senderNumber) {
           setWhatsappPhone(data.senderNumber);
         }
-        // Recipient number is configured by user
         if (data.recipientNumber) {
           setRecipientNumber(data.recipientNumber);
+          // Update localStorage with backend data
+          saveWhatsappConfigToLocal(data.recipientNumber, data.senderNumber);
         }
       } catch (err) {
         console.error('Failed to load WhatsApp config:', err);
       }
     };
     
+    // Save config to localStorage
+    const saveWhatsappConfigToLocal = (recipient, sender) => {
+      const config = {
+        recipientNumber: recipient,
+        phoneNumber: sender || whatsappPhone,
+        lastConnected: new Date().toISOString()
+      };
+      localStorage.setItem(`electrofind_whatsapp_${sellerId}`, JSON.stringify(config));
+    };
+    
     checkWhatsappStatus();
     loadWhatsappConfig();
   }, [sellerId]);
+
+  // Save WhatsApp config to localStorage whenever it changes
+  useEffect(() => {
+    if (!sellerId) return;
+    
+    const config = {
+      recipientNumber,
+      phoneNumber: whatsappPhone,
+      lastConnected: new Date().toISOString()
+    };
+    localStorage.setItem(`electrofind_whatsapp_${sellerId}`, JSON.stringify(config));
+  }, [recipientNumber, whatsappPhone, sellerId]);
 
   const handleCancelEdit = () => {
     setIsEditingPrompt(false);
@@ -486,6 +575,20 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
     setSelectedConversation(null);
   };
 
+  // Render full-screen conversation view
+  const renderConversationView = () => {
+    if (!showConversationModal || !selectedConversation) return null;
+    
+    return (
+      <SellerConversationView
+        conversation={selectedConversation}
+        sellerData={sellerData}
+        sellerId={sellerId}
+        onClose={handleCloseConversation}
+      />
+    );
+  };
+
   const handleSimulateOrder = async () => {
     if (!sellerId) {
       alert('Seller ID not found');
@@ -639,7 +742,9 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
                     {conv.whatsappNotified ? 'NOTIFIED' : 'ACTIVE'}
                   </span>
                   <span className="inquiry-time">
-                    {conv.createdAt ? new Date(conv.createdAt).toLocaleString() : 'Just now'}
+                    {conv.createdAt && !isNaN(new Date(conv.createdAt).getTime()) 
+                      ? new Date(conv.createdAt).toLocaleString() 
+                      : 'Just now'}
                   </span>
                 </div>
               </div>
@@ -914,6 +1019,12 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
     </div>
   );
 
+  // Close mobile menu when tab changes
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setIsMobileMenuOpen(false);
+  };
+
   return (
     <div className="org-dashboard">
       <nav className="org-navbar">
@@ -925,7 +1036,9 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
           </div>
           <span className="navbar-logo-text">ElectroFind</span>
         </div>
-        <div className="navbar-nav">
+        
+        {/* Desktop Navigation */}
+        <div className="navbar-nav desktop-nav">
           <button 
             className={`nav-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActiveTab('dashboard')}
@@ -945,13 +1058,99 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
             Customer Conversations
           </button>
         </div>
-        <div className="navbar-actions">
+
+        {/* Mobile Hamburger Button */}
+        <button 
+          className="mobile-menu-btn"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          aria-label="Toggle menu"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            {isMobileMenuOpen ? (
+              <path d="M18 6L6 18M6 6l12 12" />
+            ) : (
+              <path d="M3 12h18M3 6h18M3 18h18" />
+            )}
+          </svg>
+        </button>
+        
+        <div className="navbar-actions desktop-actions">
           <button className="btn btn-secondary" onClick={onLogout}>
             Log Out
           </button>
         </div>
       </nav>
 
+      {/* Mobile Navigation Drawer */}
+      <div className={`mobile-nav-drawer ${isMobileMenuOpen ? 'open' : ''}`}>
+        <div className="mobile-nav-header">
+          <span className="mobile-nav-title">Menu</span>
+          <button 
+            className="mobile-nav-close"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-label="Close menu"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="mobile-nav-links">
+          <button 
+            className={`mobile-nav-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => handleTabChange('dashboard')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            Dashboard
+          </button>
+          <button 
+            className={`mobile-nav-tab ${activeTab === 'products' ? 'active' : ''}`}
+            onClick={() => handleTabChange('products')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            Add Products
+          </button>
+          <button 
+            className={`mobile-nav-tab ${activeTab === 'conversations' ? 'active' : ''}`}
+            onClick={() => handleTabChange('conversations')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            Customer Conversations
+          </button>
+        </div>
+        <div className="mobile-nav-footer">
+          <button className="btn btn-secondary btn-full" onClick={onLogout}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Log Out
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Drawer Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="mobile-nav-overlay"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {renderConversationView()}
+      
       <main className="org-main">
         {activeTab === 'products' ? renderAddProducts() : 
          activeTab === 'conversations' ? renderConversations() : (

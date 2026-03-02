@@ -62,10 +62,65 @@ const SellerChat = ({ productData, userData, onClose }) => {
     }
   };
 
-  // Initialize chat session on mount
+  // Check for existing conversation and resume, or start new session
   useEffect(() => {
-    const startChatSession = async () => {
+    const checkExistingChatAndStart = async () => {
       try {
+        // First, check if there's an existing conversation for this user + seller + product
+        console.log('[SellerChat] Checking for existing conversations for user:', userEmail);
+        const existingChatsResponse = await fetch(
+          `${API_URL}/api/seller-user-chat/user-conversations/${encodeURIComponent(userEmail)}`
+        );
+        const existingChatsData = await existingChatsResponse.json();
+        
+        if (existingChatsData.success && existingChatsData.conversations?.length > 0) {
+          // Look for a conversation with the same seller and product
+          const matchingChat = existingChatsData.conversations.find(conv => 
+            conv.sellerId === sellerId && 
+            conv.productData?.product_title === productData.product_title
+          );
+          
+          if (matchingChat) {
+            console.log('[SellerChat] Found existing conversation:', matchingChat.chatId);
+            // Resume existing conversation
+            setSessionId(matchingChat.sessionId);
+            setChatId(matchingChat.chatId);
+            setExtractedInfo(matchingChat.extractedInfo || {});
+            setNotificationSent(matchingChat.whatsappNotified || false);
+            
+            // Convert stored messages to UI format
+            const loadedMessages = matchingChat.messages.map((m, idx) => ({
+              id: idx + 1,
+              type: m.role === 'Customer' ? 'user' : 'seller',
+              sender: m.role === 'Customer' ? 'You' : (productData.store || 'Seller Support'),
+              content: m.content,
+              timestamp: new Date(m.timestamp).toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              }),
+              isFirstInGroup: true
+            }));
+            
+            setMessages(loadedMessages);
+            setIsStarting(false);
+            
+            // Show a subtle indicator that this is a resumed conversation
+            const resumedMessage = {
+              id: Date.now(),
+              type: 'seller',
+              sender: productData.store || 'Seller Support',
+              content: '👋 Welcome back! Continuing your conversation about this product.',
+              timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+              isFirstInGroup: true,
+              isNotification: true
+            };
+            setMessages(prev => [...prev, resumedMessage]);
+            return;
+          }
+        }
+        
+        // No existing conversation found, start a new session
+        console.log('[SellerChat] No existing conversation found, starting new session');
         const response = await fetch(`${API_URL}/api/seller/chat/start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -110,7 +165,7 @@ const SellerChat = ({ productData, userData, onClose }) => {
           }, 0);
         }
       } catch (error) {
-        console.error('Failed to start chat session:', error);
+        console.error('Failed to start/resume chat session:', error);
         // Fallback welcome message
         const welcomeMessage = {
           id: Date.now(),
@@ -126,7 +181,7 @@ const SellerChat = ({ productData, userData, onClose }) => {
       }
     };
 
-    startChatSession();
+    checkExistingChatAndStart();
     
     // Cleanup on unmount
     return () => {
@@ -138,7 +193,7 @@ const SellerChat = ({ productData, userData, onClose }) => {
         }).catch(err => console.error('Failed to end chat:', err));
       }
     };
-  }, [productData, userData]);
+  }, [productData, userData, userEmail, sellerId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -407,13 +462,29 @@ const SellerChat = ({ productData, userData, onClose }) => {
 
   const quickActions = [
     'Check Stock',
-    'Warranty Info', 
-    'Delivery Time',
-    'Bulk Discount'
+    'Delivery Time'
   ];
 
-  const formatDate = () => {
-    return 'Today';
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return '';
+      
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+      
+      if (isToday) return 'Today';
+      
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+      
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch (e) {
+      return '';
+    }
   };
 
   const getInitials = (name) => {
@@ -478,29 +549,7 @@ const SellerChat = ({ productData, userData, onClose }) => {
           {/* Date Divider */}
           {!isStarting && messages.length > 0 && (
             <div className="date-divider">
-              <span>{formatDate()}</span>
-            </div>
-          )}
-
-          {/* Product Card */}
-          {!isStarting && (
-            <div className="product-card">
-              <div className="product-card-content">
-                <div className="product-card-image" style={{ background: '#374151' }}></div>
-                <div className="product-card-details">
-                  <h3 className="product-card-name">{productData.product_title}</h3>
-                  <p className="product-card-specs">
-                    {productData.specs ? productData.specs.join(' • ') : 'High Quality • Fast Shipping • Warranty'}
-                  </p>
-                  <div className="product-card-price-row">
-                    <span className="product-card-price">{productData.price}</span>
-                    <a href="#" className="view-details-link" onClick={(e) => e.preventDefault()}>View Details</a>
-                  </div>
-                </div>
-              </div>
-              <div className="product-card-footer">
-                You started a conversation about this item
-              </div>
+              <span>Today</span>
             </div>
           )}
 
@@ -509,19 +558,17 @@ const SellerChat = ({ productData, userData, onClose }) => {
             <div key={groupIndex} className={`message-group ${group.type}`}>
               {group.messages.map((message, msgIndex) => (
                 <React.Fragment key={message.id}>
-                  {msgIndex === 0 && group.type === 'seller' && (
-                    <div className="message-sender">
-                      <div className="message-sender-avatar">{getInitials(productData.store)}</div>
-                      <span>{message.sender}</span>
-                      <span>•</span>
-                      <span>{message.timestamp}</span>
-                    </div>
-                  )}
-                  {msgIndex === 0 && group.type === 'user' && (
-                    <div className="message-sender" style={{ justifyContent: 'flex-end' }}>
-                      <span>{message.timestamp}</span>
-                      <span>•</span>
-                      <span>{message.sender}</span>
+                  {msgIndex === 0 && (
+                    <div className={`message-sender ${group.type}`}>
+                      {group.type === 'seller' ? (
+                        <>
+                          <div className="message-sender-avatar">{getInitials(productData.store)}</div>
+                          <span className="sender-name">{message.sender}</span>
+                          <span className="sender-time">{message.timestamp}</span>
+                        </>
+                      ) : (
+                        <span className="sender-time">{message.timestamp}</span>
+                      )}
                     </div>
                   )}
                   <div className={`message-bubble ${group.type} ${message.isNotification ? 'notification' : ''}`}>
@@ -568,23 +615,7 @@ const SellerChat = ({ productData, userData, onClose }) => {
 
         {/* Input Area */}
         <div className="seller-chat-input-area">
-          <p className="input-hint-text">Press Enter to send, Shift + Enter for new line</p>
           <div className="seller-chat-input-wrapper">
-            <button className="input-action-btn" disabled={isLoading || isStarting}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 8v8M8 12h8"/>
-              </svg>
-            </button>
-            
-            <button className="input-action-btn" disabled={isLoading || isStarting}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-              </svg>
-            </button>
-            
             <input
               type="text"
               className="seller-chat-input"

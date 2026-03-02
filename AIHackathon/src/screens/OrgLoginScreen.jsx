@@ -221,7 +221,7 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
                 {loading ? 'Logging in...' : 'Login with Demo Account'}
               </button>
               <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px', textAlign: 'center' }}>
-                demo@eindia.com / demo123
+                demo@electrofind.com / demo123
               </p>
             </div>
           )}

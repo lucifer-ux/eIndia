@@ -44,19 +44,7 @@ const Navbar = ({ logoIcon, logoText, onLoginClick, onSignupClick, showAuthButto
         )}
 
         {/* Desktop Actions */}
-        <div className="navbar-actions desktop-actions">
-          {rightElement}
-          {showAuthButtons && (
-            <>
-              <button className="btn btn-outline" onClick={onLoginClick}>
-                Log In
-              </button>
-              <button className="btn btn-primary" onClick={onSignupClick}>
-                Sign Up
-              </button>
-            </>
-          )}
-        </div>
+      
 
         {/* Mobile Menu Button */}
         <button className="mobile-menu-btn" onClick={toggleMobileMenu} aria-label="Open menu">
@@ -100,9 +88,6 @@ const Navbar = ({ logoIcon, logoText, onLoginClick, onSignupClick, showAuthButto
 
         {showAuthButtons && (
           <div className="mobile-nav-footer">
-            <button className="btn btn-primary btn-full" onClick={handleSignup}>
-              Sign Up
-            </button>
             <button className="btn btn-outline btn-full" onClick={handleLogin}>
               Log In
             </button>

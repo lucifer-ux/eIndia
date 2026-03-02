@@ -82,17 +82,13 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
     }
   };
 
-  const handleDemoLogin = async () => {
+  const handleDemoLogin = () => {
+    // Prefill demo credentials instead of auto-login
+    setFormData({
+      email: 'demo@eindia.com',
+      password: 'demo123'
+    });
     setError('');
-    setLoading(true);
-    try {
-      const result = await loginWithDemoSeller();
-      onLoginSuccess(result.seller || result);
-    } catch (err) {
-      setError(err.message || 'Demo login failed');
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Icons
@@ -211,30 +207,55 @@ const OrgLoginScreen = ({ onLoginSuccess, onBackToHome }) => {
                 type="button"
                 className="login-submit-btn"
                 onClick={handleDemoLogin}
-                disabled={loading}
                 style={{ 
                   background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   fontSize: '14px',
                   padding: '12px'
                 }}
               >
-                {loading ? 'Logging in...' : 'Login with Demo Account'}
+                Fill Demo Credentials
               </button>
               <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px', textAlign: 'center' }}>
-                demo@electrofind.com / demo123
+                Click to prefill: demo@eindia.com / demo123
               </p>
             </div>
           )}
         </div>
 
-        <p className="login-footer">
-          <button className="back-link" onClick={() => setIsSignup(!isSignup)}>
-            {isSignup ? t('login.alreadyHaveAccount') : t('login.dontHaveAccount')}
-          </button>
+        <div className="login-footer" style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', marginBottom: '20px' }}>
+          {!isSignup && (
+            <button 
+              className="btn btn-primary" 
+              onClick={() => setIsSignup(true)}
+              style={{ 
+                fontSize: '16px', 
+                padding: '14px 32px',
+                minWidth: '200px',
+                fontWeight: '600',
+                marginBottom: '12px'
+              }}
+            >
+              {t('login.dontHaveAccount')}
+            </button>
+          )}
+          {isSignup && (
+            <button 
+              className="btn btn-primary" 
+              onClick={() => setIsSignup(false)}
+              style={{ 
+                fontSize: '16px', 
+                padding: '14px 32px',
+                minWidth: '200px',
+                fontWeight: '600'
+              }}
+            >
+              {t('login.alreadyHaveAccount')}
+            </button>
+          )}
           <button className="back-link" onClick={onBackToHome}>
             {t('login.backToHome')}
           </button>
-        </p>
+        </div>
       </div>
     </div>
   );

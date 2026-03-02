@@ -736,7 +736,7 @@ const Dashboard = ({ onLogout, onStartSellerChat, user }) => {
                   <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                 </svg>
               </div>
-              <span className="dashboard-logo-text">ElectroFind</span>
+              <span className="dashboard-logo-text">eIndia</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <LanguageSelector />

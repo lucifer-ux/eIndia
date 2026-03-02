@@ -134,7 +134,7 @@ const LoginScreen = ({ onLoginSuccess, onBackToHome }) => {
     <div className="login-screen">
       <Navbar
         logoIcon={<LightningIcon />}
-        logoText="ElectroFind"
+        logoText="eIndia"
         showAuthButtons={false}
       />
 

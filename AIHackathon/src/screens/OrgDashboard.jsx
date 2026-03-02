@@ -7,7 +7,7 @@ const API_BASE_URL = 'http://localhost:3001/api';
 const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
   const [isEditingPrompt, setIsEditingPrompt] = useState(false);
-  const [promptText, setPromptText] = useState(`Act as a senior technical sales engineer for ElectroFind. Your goal is to assist engineers and procurement managers in finding the right electronic components. Always verify stock availability before making commitments. Provide accurate technical specifications and competitive pricing. Be professional, helpful, and concise in your responses.`);
+  const [promptText, setPromptText] = useState(`Act as a senior technical sales engineer for eIndia. Your goal is to assist engineers and procurement managers in finding the right electronic components. Always verify stock availability before making commitments. Provide accurate technical specifications and competitive pricing. Be professional, helpful, and concise in your responses.`);
   const [isAgentActive, setIsAgentActive] = useState(true);
   
   // WhatsApp integration state
@@ -249,7 +249,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
     
     // Attempt to auto-restore WhatsApp connection
     const attemptAutoReconnect = async () => {
-      const savedConfig = localStorage.getItem(`electrofind_whatsapp_${sellerId}`);
+      const savedConfig = localStorage.getItem(`eindia_whatsapp_${sellerId}`);
       if (!savedConfig) return;
       
       try {
@@ -287,7 +287,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
       if (!sellerId) return;
       
       // First try localStorage for instant loading
-      const savedConfig = localStorage.getItem(`electrofind_whatsapp_${sellerId}`);
+      const savedConfig = localStorage.getItem(`eindia_whatsapp_${sellerId}`);
       if (savedConfig) {
         try {
           const config = JSON.parse(savedConfig);
@@ -327,7 +327,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
         phoneNumber: sender || whatsappPhone,
         lastConnected: new Date().toISOString()
       };
-      localStorage.setItem(`electrofind_whatsapp_${sellerId}`, JSON.stringify(config));
+      localStorage.setItem(`eindia_whatsapp_${sellerId}`, JSON.stringify(config));
     };
     
     checkWhatsappStatus();
@@ -343,7 +343,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
       phoneNumber: whatsappPhone,
       lastConnected: new Date().toISOString()
     };
-    localStorage.setItem(`electrofind_whatsapp_${sellerId}`, JSON.stringify(config));
+    localStorage.setItem(`eindia_whatsapp_${sellerId}`, JSON.stringify(config));
   }, [recipientNumber, whatsappPhone, sellerId]);
 
   const handleCancelEdit = () => {
@@ -828,7 +828,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
     <div className="add-products-section">
       <div className="add-products-header">
         <h1>Add Products</h1>
-        <p>Ingest your product catalog to power ElectroFind's AI discovery engine. Connect a database or upload files directly.</p>
+        <p>Ingest your product catalog to power eIndia's AI discovery engine. Connect a database or upload files directly.</p>
       </div>
 
       <div className="add-products-grid">
@@ -1034,7 +1034,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
           </div>
-          <span className="navbar-logo-text">ElectroFind</span>
+          <span className="navbar-logo-text">eIndia</span>
         </div>
         
         {/* Desktop Navigation */}

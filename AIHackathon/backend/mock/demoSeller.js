@@ -5,14 +5,14 @@
 
 // Demo Seller Credentials
 const DEMO_CREDENTIALS = {
-  email: 'demo@electrofind.com',
+  email: 'demo@eindia.com',
   password: 'demo123'
 };
 
 // Demo Seller Profile
 const DEMO_SELLER = {
   sellerId: 'demo-seller-001',
-  email: 'demo@electrofind.com',
+  email: 'demo@eindia.com',
   displayName: 'Demo Electronics Store',
   companyName: 'Demo Electronics Pvt Ltd',
   isLoggedIn: true,

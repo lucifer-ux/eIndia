@@ -61,7 +61,7 @@ const LandingPage = ({ onLoginAsUser, onLoginAsOrg }) => {
     <div className="landing-page">
       <Navbar
         logoIcon={<LightningIcon />}
-        logoText="ElectroFind"
+        logoText="eIndia"
         showAuthButtons={false}
         rightElement={<LanguageSelector />}
       />
@@ -96,7 +96,7 @@ const LandingPage = ({ onLoginAsUser, onLoginAsOrg }) => {
 
       <Footer
         logoIcon={<LightningIcon />}
-        companyName="ElectroFind Inc."
+        companyName="eIndia Inc."
         links={[
           { text: t('footer.privacy'), href: '#privacy' },
           { text: t('footer.terms'), href: '#terms' },

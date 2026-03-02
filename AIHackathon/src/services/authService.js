@@ -7,7 +7,7 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase/firebaseConfig';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 /**
  * Helper to send Firebase ID token to backend for verification and DynamoDB storage

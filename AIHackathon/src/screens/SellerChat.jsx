@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './SellerChat.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const SellerChat = ({ productData, userData, onClose }) => {
   const [messages, setMessages] = useState([]);
@@ -16,7 +16,7 @@ const SellerChat = ({ productData, userData, onClose }) => {
   const messagesContainerRef = useRef(null);
 
   // Get seller info from product data
-  const sellerId = productData.storeId || 'demo-seller-001';
+  const sellerId = productData.storeId || '5oAowIdRDHRbpJXoDoYU5g2D8D13';
   const userEmail = userData?.email || 'anonymous@user.com';
 
   // Save conversation to DynamoDB
@@ -125,7 +125,7 @@ const SellerChat = ({ productData, userData, onClose }) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            sellerId: productData.storeId || 'demo-seller-001',
+            sellerId: productData.storeId || '5oAowIdRDHRbpJXoDoYU5g2D8D13',
             productData: {
               product_title: productData.product_title,
               price: productData.price,
@@ -319,7 +319,7 @@ const SellerChat = ({ productData, userData, onClose }) => {
   // Analyze message with LLM and send notification if needed
   const analyzeAndNotify = async (triggerMessage) => {
     try {
-      const sellerId = productData.storeId || 'demo-seller-001';
+      const sellerId = productData.storeId || '5oAowIdRDHRbpJXoDoYU5g2D8D13';
       
       // Build full conversation history
       const fullConversation = messages.map(m => ({
@@ -361,7 +361,7 @@ const SellerChat = ({ productData, userData, onClose }) => {
   // Send WhatsApp notification to seller
   const sendWhatsAppNotification = async (extractedInfo) => {
     try {
-      const sellerId = productData.storeId || 'demo-seller-001';
+      const sellerId = productData.storeId || '5oAowIdRDHRbpJXoDoYU5g2D8D13';
       
       // Build conversation summary from recent messages
       const recentMessages = messages.slice(-6).map(m => ({

@@ -9,7 +9,7 @@ const multer = require('multer');
 require('dotenv').config();
 const authRoutes = require('./authRoutes');
 const { searchAssuredInventory, getProductBySku, getAssuredSeller } = require('./sellerInventory');
-const { createChat, getUserChats, getChat, updateChat, deleteChat, deleteAllUserChats, saveSellerUserChat, getSellerConversations, getSellerUserChat, updateSellerUserChat, updateConversationStatus, deleteSellerUserChat, getUserConversations, incrementTotalQueries, incrementResolvedQueries, updateSellerPrompt, getSeller } = require('./dynamodb');
+const { createChat, getUserChats, getChat, updateChat, deleteChat, deleteAllUserChats, saveSellerUserChat, getSellerConversations, getSellerUserChat, updateSellerUserChat, updateConversationStatus, deleteSellerUserChat, getUserConversations, incrementTotalQueries, incrementResolvedQueries, updateSellerPrompt, getSeller, updateSellerWhatsAppNumber, getSellerWhatsAppNumber } = require('./dynamodb');
 const whatsappService = require('./twilioService');
 
 const app = express();
@@ -58,15 +58,6 @@ const conversationState = new Map();
 // Store seller prompts and chat sessions
 const sellerPrompts = new Map(); // sellerId -> prompt
 const sellerChatSessions = new Map(); // sessionId -> { sellerId, productData, messages }
-const sellerWhatsappConfig = new Map(); // sellerId -> { recipientNumber }
-
-// Initialize demo seller WhatsApp config with environment variable or default
-if (process.env.DEMO_SELLER_WHATSAPP_NUMBER) {
-  sellerWhatsappConfig.set('demo-seller-001', {
-    recipientNumber: process.env.DEMO_SELLER_WHATSAPP_NUMBER
-  });
-  console.log('[WhatsApp] Demo seller WhatsApp config initialized');
-}
 
 // Store buy readiness tracking per session
 const buyReadinessTracking = new Map(); // sessionId -> { lastChecked, isReady, notified }
@@ -92,7 +83,7 @@ const TESTING_MODE = process.env.TESTING_MODE === 'true' || true;
 
 // Demo/Test Seller Configuration
 const DEMO_SELLER_CONFIG = {
-  sellerId: 'demo-seller-001',
+  sellerId: '5oAowIdRDHRbpJXoDoYU5g2D8D13',
   name: 'Demo Electronics Store',
   displayName: 'Demo Electronics Store',
   email: 'demo@electrofind.com',
@@ -1854,18 +1845,20 @@ app.post('/api/seller/chat/notify', async (req, res) => {
     return res.status(400).json({ error: 'sellerId is required' });
   }
   
-  // Get WhatsApp config for seller
-  const config = sellerWhatsappConfig.get(sellerId);
-  const recipientNumber = config?.recipientNumber;
+  // Normalize seller ID (handle legacy IDs)
+  const normalizedSellerId = normalizeSellerId(sellerId);
+  
+  // Get recipient number from DynamoDB
+  const recipientNumber = await getSellerWhatsAppNumber(normalizedSellerId);
   
   if (!recipientNumber) {
     return res.status(400).json({ error: 'Recipient number not configured' });
   }
   
-  // Check WhatsApp connection status
-  const status = whatsappService.getStatus(sellerId);
-  if (!status.connected) {
-    return res.status(503).json({ error: 'WhatsApp not connected', connected: false });
+  // Check if Twilio is configured
+  const isTwilioConfigured = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_NUMBER);
+  if (!isTwilioConfigured) {
+    return res.status(503).json({ error: 'WhatsApp not configured', connected: false });
   }
   
   try {
@@ -2033,26 +2026,33 @@ app.post('/api/whatsapp/send', async (req, res) => {
 });
 
 // Get seller's WhatsApp configuration
-app.get('/api/whatsapp/config/:sellerId', (req, res) => {
+app.get('/api/whatsapp/config/:sellerId', async (req, res) => {
   const { sellerId } = req.params;
   
   if (!sellerId) {
     return res.status(400).json({ error: 'sellerId is required' });
   }
   
-  // Get the connected client's phone number (sender)
-  const status = whatsappService.getStatus(sellerId);
-  const senderNumber = status.phoneNumber || null;
-  
-  // Get the configured recipient number
-  const config = sellerWhatsappConfig.get(sellerId);
-  const recipientNumber = config?.recipientNumber || '';
-  
-  res.json({ 
-    senderNumber, 
-    recipientNumber,
-    connected: status.connected 
-  });
+  try {
+    // Get the sender number from Twilio config (from env)
+    const senderNumber = process.env.TWILIO_WHATSAPP_NUMBER || null;
+    
+    // Get the configured recipient number from DynamoDB
+    const recipientNumber = await getSellerWhatsAppNumber(sellerId) || '';
+    
+    // Check if Twilio is properly configured
+    const isConfigured = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_NUMBER);
+    
+    res.json({ 
+      senderNumber, 
+      recipientNumber,
+      connected: isConfigured,
+      configured: isConfigured
+    });
+  } catch (error) {
+    console.error('[WhatsApp Config] Error fetching config:', error);
+    res.status(500).json({ error: 'Failed to fetch WhatsApp configuration' });
+  }
 });
 
 // Save seller's WhatsApp recipient number
@@ -2063,31 +2063,36 @@ app.post('/api/whatsapp/config', async (req, res) => {
     return res.status(400).json({ error: 'sellerId is required' });
   }
   
-  sellerWhatsappConfig.set(sellerId, {
-    recipientNumber: recipientNumber || ''
-  });
-  
-  // Send test message if requested and number is provided
-  if (sendTest && recipientNumber) {
-    try {
-      const testResult = await whatsappService.sendTestMessage(sellerId, recipientNumber);
-      return res.json({ 
-        success: true, 
-        message: 'WhatsApp configuration saved and test message sent',
-        testMessage: testResult
-      });
-    } catch (error) {
-      console.error('Test message failed:', error);
-      // Still save config even if test message fails
-      return res.json({ 
-        success: true, 
-        message: 'WhatsApp configuration saved but test message failed',
-        warning: error.message
-      });
+  try {
+    // Save to DynamoDB for persistence
+    await updateSellerWhatsAppNumber(sellerId, recipientNumber || '');
+    console.log(`[WhatsApp Config] Saved recipient number for seller ${sellerId}`);
+    
+    // Send test message if requested and number is provided
+    if (sendTest && recipientNumber) {
+      try {
+        const testResult = await whatsappService.sendTestMessage(sellerId, recipientNumber);
+        return res.json({ 
+          success: true, 
+          message: 'WhatsApp configuration saved and test message sent',
+          testMessage: testResult
+        });
+      } catch (error) {
+        console.error('Test message failed:', error);
+        // Still save config even if test message fails
+        return res.json({ 
+          success: true, 
+          message: 'WhatsApp configuration saved but test message failed',
+          warning: error.message
+        });
+      }
     }
+    
+    res.json({ success: true, message: 'WhatsApp configuration saved' });
+  } catch (error) {
+    console.error('[WhatsApp Config] Error saving config:', error);
+    res.status(500).json({ error: 'Failed to save WhatsApp configuration' });
   }
-  
-  res.json({ success: true, message: 'WhatsApp configuration saved' });
 });
 
 // Send test WhatsApp message
@@ -2098,14 +2103,13 @@ app.post('/api/whatsapp/test', async (req, res) => {
     return res.status(400).json({ error: 'sellerId is required' });
   }
   
-  const config = sellerWhatsappConfig.get(sellerId);
-  const recipientNumber = config?.recipientNumber;
-  
-  if (!recipientNumber) {
-    return res.status(400).json({ error: 'Recipient number not configured' });
-  }
-  
   try {
+    const recipientNumber = await getSellerWhatsAppNumber(sellerId);
+    
+    if (!recipientNumber) {
+      return res.status(400).json({ error: 'Recipient number not configured' });
+    }
+    
     const result = await whatsappService.sendTestMessage(sellerId, recipientNumber);
     res.json({ success: true, message: 'Test message sent', result });
   } catch (error) {
@@ -2122,15 +2126,14 @@ app.post('/api/whatsapp/send-to-recipient', async (req, res) => {
     return res.status(400).json({ error: 'sellerId and message are required' });
   }
   
-  // Get the configured recipient number
-  const config = sellerWhatsappConfig.get(sellerId);
-  const recipientNumber = config?.recipientNumber;
-  
-  if (!recipientNumber) {
-    return res.status(400).json({ error: 'Recipient number not configured' });
-  }
-  
   try {
+    // Get the configured recipient number from DynamoDB
+    const recipientNumber = await getSellerWhatsAppNumber(sellerId);
+    
+    if (!recipientNumber) {
+      return res.status(400).json({ error: 'Recipient number not configured' });
+    }
+    
     const result = await whatsappService.sendMessage(sellerId, recipientNumber, message);
     res.json(result);
   } catch (error) {
@@ -2395,22 +2398,35 @@ Output valid JSON only:`;
   }
 }
 
+// Map legacy seller IDs to correct IDs
+const SELLER_ID_MAP = {
+  'demo-seller-001': '5oAowIdRDHRbpJXoDoYU5g2D8D13'
+};
+
+function normalizeSellerId(sellerId) {
+  return SELLER_ID_MAP[sellerId] || sellerId;
+}
+
 /**
  * Sends WhatsApp notification when user is ready to buy
  */
 async function sendBuyReadinessNotification(sellerId, chatSession, assessment) {
-  const config = sellerWhatsappConfig.get(sellerId);
-  const recipientNumber = config?.recipientNumber;
+  // Normalize seller ID (handle legacy IDs)
+  const normalizedSellerId = normalizeSellerId(sellerId);
+  
+  // Get recipient number from DynamoDB
+  const recipientNumber = await getSellerWhatsAppNumber(normalizedSellerId);
   
   if (!recipientNumber) {
-    console.log(`[BuyReadiness] No recipient number configured for seller ${sellerId}`);
+    console.log(`[BuyReadiness] No recipient number configured for seller ${sellerId} (normalized: ${normalizedSellerId})`);
     return { sent: false, reason: 'no_recipient_configured' };
   }
   
-  const status = whatsappService.getStatus(sellerId);
-  if (!status.connected) {
-    console.log(`[BuyReadiness] WhatsApp not connected for seller ${sellerId}`);
-    return { sent: false, reason: 'whatsapp_not_connected' };
+  // Check if Twilio is configured
+  const isTwilioConfigured = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_NUMBER);
+  if (!isTwilioConfigured) {
+    console.log(`[BuyReadiness] Twilio not configured`);
+    return { sent: false, reason: 'twilio_not_configured' };
   }
   
   const productName = chatSession.productData?.product_title || 'Unknown Product';

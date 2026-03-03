@@ -148,6 +148,33 @@ async function updateSellerPrompt(sellerId, prompt) {
 }
 
 /**
+ * Update seller's WhatsApp recipient number
+ */
+async function updateSellerWhatsAppNumber(sellerId, recipientNumber) {
+    const params = {
+        TableName: SELLER_TABLE,
+        Key: { sellerId },
+        UpdateExpression: 'SET whatsAppRecipientNumber = :number, updatedAt = :now',
+        ExpressionAttributeValues: {
+            ':number': recipientNumber,
+            ':now': new Date().toISOString(),
+        },
+        ReturnValues: 'ALL_NEW',
+    };
+    
+    const result = await docClient.send(new UpdateCommand(params));
+    return result.Attributes;
+}
+
+/**
+ * Get seller's WhatsApp recipient number
+ */
+async function getSellerWhatsAppNumber(sellerId) {
+    const seller = await getSeller(sellerId);
+    return seller?.whatsAppRecipientNumber || null;
+}
+
+/**
  * Get a user by userId
  */
 async function getUser(userId) {
@@ -501,6 +528,8 @@ module.exports = {
     incrementTotalQueries,
     incrementResolvedQueries,
     updateSellerPrompt,
+    updateSellerWhatsAppNumber,
+    getSellerWhatsAppNumber,
     // User chat operations
     createChat,
     getUserChats,

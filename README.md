@@ -21,19 +21,19 @@
 ## 📸 Product Images
 
 ### Organization Login
-![Organization Login](./docs/images/OrgLogin.png)
+![Organization Login](./AIHackathon/docs/images/OrgLogin.png)
 *Secure login page for sellers and organizations*
 
 ### Organization Dashboard
-![Organization Dashboard](./docs/images/ogrDashboard.png)
+![Organization Dashboard](./AIHackathon/docs/images/ogrDashboard.png)
 *Comprehensive dashboard for sellers to manage AI agent, view analytics, and configure WhatsApp integration*
 
 ### User Login
-![User Login](./docs/images/userLogin.png)
+![User Login](./AIHackathon/docs/images/userLogin.png)
 *Customer login interface with Firebase authentication*
 
 ### User Chat Conversation
-![User Chat Conversation](./docs/images/userChatConversation.png)
+![User Chat Conversation](./AIHackathon/docs/images/userChatConversation.png)
 *AI-powered chat interface for customers to discover and inquire about electronic products*
 
 ---

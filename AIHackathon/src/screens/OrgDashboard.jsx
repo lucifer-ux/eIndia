@@ -167,6 +167,12 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
     return { text: 'NEW REQUEST', color: 'blue' };
   };
 
+  // Mask recipient number for display - masks all characters except the first one
+  const maskRecipientNumber = (number) => {
+    if (!number || number.length <= 1) return number;
+    return number[0] + 'x'.repeat(number.length - 1);
+  };
+
   const topComponents = [
     { name: 'ESP32-WROOM', queries: 1240, percentage: 85 },
     { name: 'Arduino Uno R3', queries: 980, percentage: 65 }
@@ -1443,7 +1449,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
                           <span className="number-desc">Auto-captured from QR scan</span>
                         </div>
                       </div>
-                      <span className="number-value">{whatsappPhone || 'Not connected'}</span>
+                      <span className="number-value">{maskRecipientNumber(whatsappPhone) || 'Not connected'}</span>
                     </div>
                     
                     <div className="number-row">
@@ -1454,7 +1460,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
                           <span className="number-desc">Number to receive messages</span>
                         </div>
                       </div>
-                      <span className="number-value">{recipientNumber || 'Not set'}</span>
+                      <span className="number-value">{maskRecipientNumber(recipientNumber) || 'Not set'}</span>
                     </div>
                     
                     <button 
@@ -1476,7 +1482,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
                         {whatsappStatus === 'disconnected' && 'Not Connected'}
                         {whatsappStatus === 'connecting' && 'Connecting...'}
                         {whatsappStatus === 'qr_ready' && 'QR Code Ready'}
-                        {whatsappStatus === 'connected' && `Connected ${whatsappPhone ? `(${whatsappPhone})` : ''}`}
+                        {whatsappStatus === 'connected' && `Connected ${whatsappPhone ? `(${maskRecipientNumber(whatsappPhone)})` : ''}`}
                       </span>
                     </div>
                   </div>
@@ -1557,7 +1563,7 @@ const OrgDashboard = ({ onLogout, sellerId, sellerData }) => {
                           <div className="qr-success">
                             <div className="success-icon">✅</div>
                             <h4>WhatsApp Connected!</h4>
-                            <p className="success-phone">{whatsappPhone}</p>
+                            <p className="success-phone">{maskRecipientNumber(whatsappPhone)}</p>
                             <p className="success-message">You can now configure the recipient number to receive notifications.</p>
                           </div>
                         )}

@@ -44,7 +44,7 @@
     "dashboard.greeting": "Hello! I'm your AI assistant. I can help you find electronics, research products, or answer questions. What would you like to know?",
     "dashboard.placeholder": "Ask about electronics, compare prices, or search for products...",
     "dashboard.transcribing": "Transcribing...",
-    "dashboard.inputHint": "Press Enter to send • Try \"best wireless earbuds under $100\"",
+    "dashboard.inputHint": "",
     "dashboard.error": "Sorry, I encountered an error. Please try again.",
     "dashboard.sources": "Sources:",
     "dashboard.keySpecs": "Key specs:",
